@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#05080b" />
+<title>育肥场作业流程 · 3D 园区</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<canvas id="scene"></canvas>
+
+<div id="ui">
+  <div class="brand">
+    <div class="eyebrow"><i></i>MUYE FEEDLOT · UNIT 01</div>
+    <h1>育肥场作业流程</h1>
+    <p class="lead">车辆进场<em>→</em>过磅分流<em>→</em>TMR 配料<em>→</em>日粮饲喂<em>→</em>出栏装车</p>
+    <ul class="legend" id="legend"></ul>
+  </div>
+
+  <div class="views">
+    <div class="views-title">视角 · VIEW</div>
+    <div class="views-row" id="views"></div>
+  </div>
+
+  <div class="hint">左键拖拽<b>旋转</b> · 右键拖拽<b>平移</b> · 滚轮<b>缩放</b> · 双击<b>复位</b> · WASD <b>移动</b></div>
+
+  <section class="flow">
+    <div class="flow-head">
+      <span class="t">作业流程</span>
+      <span class="e">OPERATIONS FLOW</span>
+      <span class="live"><i></i>LIVE</span>
+      <span class="clock"><span>夜班 NIGHT</span><b id="clock">03:18:00</b></span>
+    </div>
+    <ol class="steps" id="steps"></ol>
+  </section>
+</div>
+
+<div id="veil">
+  <div class="box">
+    <div class="mark"></div>
+    <h2>育肥场正在运行</h2>
+    <p>LOADING FEEDLOT</p>
+    <div class="bar"></div>
+  </div>
+</div>
+
+<script src="vendor/three.min.js"></script>
+<script src="js/utils.js?v=3"></script>
+<script src="js/layout.js?v=3"></script>
+<script src="js/world.js?v=3"></script>
+<script src="js/buildings.js?v=3"></script>
+<script src="js/vehicles.js?v=3"></script>
+<script src="js/effects.js?v=3"></script>
+<script src="js/ui.js?v=3"></script>
+<script src="js/main.js?v=3"></script>
+</body>
+</html>

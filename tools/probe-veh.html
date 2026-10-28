@@ -1,0 +1,89 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>veh-probe</title>
+<style>body{background:#111;color:#ddd;font:12px/1.5 monospace}pre{white-space:pre-wrap}</style>
+<pre id="out">running…</pre>
+<script src="../vendor/three.min.js"></script>
+<script src="../js/utils.js"></script>
+<script src="../js/layout.js"></script>
+<script src="../js/vehicles.js"></script>
+<script>
+(function () {
+  try {
+    FL.U.initTextures();
+    var scene = new THREE.Scene();
+    var fleet = FL.buildFleet(scene);
+    var out = [];
+    var ids = fleet.list.map(function (v) { return v.id; });
+    out.push('vehicles: ' + ids.join(','));
+    out.push('stops: ' + fleet.list.map(function (v) { return v.id + '=' + v.stops.length + '/' + v.path.length.toFixed(1) + 'm'; }).join('  '));
+
+    // ---- 1. 一段行程的速度曲线（t=0..130，步长 0.25s）
+    var DT = 0.25, T = 130;
+    var rows = [];
+    for (var t = 0; t <= T; t += DT) {
+      fleet.seek(t);
+      fleet.update(0);
+      rows.push({ t: t, vs: fleet.list.map(function (v) {
+        return {
+          id: v.id, v: v.v, s: v.s, dwell: v.dwellLeft > 0, x: v.x, z: v.z,
+          stage: v.stage,
+        };
+      }) });
+    }
+    // 加速度是否越界
+    var maxAcc = 0, maxAccAt = '', followStops = 0;
+    for (var i = 1; i < rows.length; i++) {
+      for (var k = 0; k < rows[i].vs.length; k++) {
+        var a = rows[i].vs[k], b = rows[i - 1].vs[k];
+        var dv = Math.abs(a.v - b.v) / DT;
+        if (dv > maxAcc) { maxAcc = dv; maxAccAt = a.id + '@' + rows[i].t; }
+        if (a.v < 0.05 && !a.dwell) followStops++;
+      }
+    }
+    out.push('max |dv/dt| = ' + maxAcc.toFixed(2) + ' m/s²  (' + maxAccAt + ')');
+    out.push('非停留却静止的采样点: ' + followStops + '  （>0 说明发生了跟车/让行等待）');
+
+    // ---- 2. 任意两车的最小中心距
+    var minD = 1e9, minPair = '', minT = 0;
+    for (var j = 0; j < rows.length; j++) {
+      var list = rows[j].vs;
+      for (var a2 = 0; a2 < list.length; a2++) {
+        for (var b2 = a2 + 1; b2 < list.length; b2++) {
+          var dx = list[a2].x - list[b2].x, dz = list[a2].z - list[b2].z;
+          var d = Math.sqrt(dx * dx + dz * dz);
+          if (d < minD) { minD = d; minPair = list[a2].id + '/' + list[b2].id; minT = rows[j].t; }
+        }
+      }
+    }
+    out.push('最小车距(中心) = ' + minD.toFixed(2) + 'm  ' + minPair + ' @t=' + minT);
+
+    // ---- 3. 每条路线一圈的长度/用时
+    out.push('每辆车的车长: ' + fleet.list.map(function (v) { return v.id + '=' + v.len; }).join(' '));
+
+    // ---- 3.5 tmr 沿程位置（找掉头段）
+    out.push('--- tmr s/v，t=90..190 ---');
+    var line = '';
+    for (var w2 = 90; w2 <= 190; w2 += 2) {
+      fleet.seek(w2); fleet.update(0);
+      var tv = fleet.list[2];
+      line += w2 + ':' + tv.s.toFixed(0) + '/' + tv.v.toFixed(1) + '  ';
+      if ((w2 - 90) % 20 === 18) { out.push(line); line = ''; }
+    }
+    out.push(line);
+    // ---- 4. 打印 t=93 前后 2 秒的明细（截帧附近）
+    out.push('');
+    for (var q = 92; q <= 96; q += 0.5) {
+      fleet.seek(q); fleet.update(0);
+      out.push('t=' + q.toFixed(1) + '  ' + fleet.list.map(function (v) {
+        return v.id + ' s=' + v.s.toFixed(0) + ' v=' + v.v.toFixed(2) + (v.dwellLeft > 0 ? ' DWELL' : '') + ' [' + v.stage + ']';
+      }).join(' | '));
+    }
+    document.getElementById('out').textContent = out.join('\n');
+    document.title = 'PROBE OK';
+  } catch (e) {
+    document.getElementById('out').textContent = 'ERR ' + e.message + '\n' + e.stack;
+    document.title = 'PROBE ERR';
+  }
+})();
+</script>

@@ -1,0 +1,88 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>clear-probe</title>
+<style>body{background:#111;color:#ddd;font:12px/1.5 monospace}pre{white-space:pre-wrap}</style>
+<pre id="out">running…</pre>
+<script src="../vendor/three.min.js"></script>
+<script src="../js/utils.js"></script>
+<script src="../js/layout.js"></script>
+<script src="../js/vehicles.js"></script>
+<script>
+(function () {
+  try {
+    FL.U.initTextures();
+    var scene = new THREE.Scene();
+    var fleet = FL.buildFleet(scene);
+
+    // 场景里需要避让的实体（AABB，米）——按布置手抄
+    var OB = [
+      { n: '青贮窖体', x1: -108.3, x2: -81.7, z1: 21.7, z2: 30.3 },
+      { n: '青贮窖围栏', x1: -110, x2: -84, z1: 30.2, z2: 31.0 },
+      { n: 'TMR 车间', x1: -114, x2: -90, z1: -19, z2: -1 },
+      { n: '筒仓1', x1: -112, x2: -104, z1: -36, z2: -28 },
+      { n: '筒仓2', x1: -98, x2: -90, z1: -36, z2: -28 },
+      { n: '筒仓3', x1: -84, x2: -76, z1: -36, z2: -28 },
+      { n: '1号牛舍', x1: -40.5, x2: 0.5, z1: -72.5, z2: -51.5 },
+      { n: '2号牛舍', x1: 7.5, x2: 48.5, z1: -72.5, z2: -51.5 },
+      { n: '3号牛舍', x1: 55.5, x2: 96.5, z1: -72.5, z2: -51.5 },
+      { n: '卸牛台', x1: -52.5, x2: -39.5, z1: -70.5, z2: -57.5 },
+      { n: '装车台', x1: 97.8, x2: 107.2, z1: -76.2, z2: -61.8 },
+      { n: '机修车间', x1: 20.5, x2: 47.5, z1: 5.5, z2: 20.5 },
+      { n: '干草棚', x1: -33.5, x2: -10.5, z1: 2.5, z2: 15.5 },
+      { n: '综合楼', x1: -119.5, x2: -100.5, z1: 72.5, z2: 82.5 },
+      { n: '门卫房', x1: -117, x2: -110, z1: 66.5, z2: 74 }
+    ];
+
+    var out = [];
+    var HALF_W = 1.28;      // 车身半宽（含后视镜余量）
+    var worst = [];
+    for (var vi = 0; vi < fleet.list.length; vi++) {
+      var v = fleet.list[vi];
+      var len = v.path.length;
+      var hi = 0;
+      for (var s = 0; s < len; s += 0.4) {
+        var p = v.path.pointAt(s, new THREE.Vector3());
+        var t = v.path.tangentAt(s, new THREE.Vector3());
+        var d = Math.hypot(t.x, t.z) || 1;
+        t.x /= d; t.z /= d;
+        var rx = t.z, rz = -t.x;          // 右向量
+        for (var li = -3; li <= 3; li++) {   // 车长方向 7 个采样
+          var along = (v.len / 2 - 0.6) * li / 3;
+          for (var wi = -1; wi <= 1; wi += 2) {
+            var px = p.x + t.x * along + rx * HALF_W * wi;
+            var pz = p.z + t.z * along + rz * HALF_W * wi;
+            for (var oi = 0; oi < OB.length; oi++) {
+              var o = OB[oi];
+              if (px > o.x1 && px < o.x2 && pz > o.z1 && pz < o.z2) {
+                var depth = Math.min(px - o.x1, o.x2 - px, pz - o.z1, o.z2 - pz);
+                if (depth > hi) { hi = depth; }
+                worst.push({ v: v.id, o: o.n, s: +s.toFixed(1), depth: +depth.toFixed(2), x: +px.toFixed(1), z: +pz.toFixed(1) });
+              }
+            }
+          }
+        }
+      }
+      out.push(v.id + ' 最大侵入 = ' + hi.toFixed(2) + 'm  (路径 ' + len.toFixed(0) + 'm)');
+    }
+    out.push('');
+    if (worst.length) {
+      // 按 (车, 障碍) 聚合
+      var agg = {};
+      worst.forEach(function (w) {
+        var k = w.v + ' × ' + w.o;
+        if (!agg[k] || w.depth > agg[k].depth) agg[k] = w;
+      });
+      Object.keys(agg).forEach(function (k) {
+        out.push('侵入: ' + k + '  最深 ' + agg[k].depth + 'm @s=' + agg[k].s + ' @(' + agg[k].x + ',' + agg[k].z + ')');
+      });
+    } else {
+      out.push('没有任何车体采样点落进障碍物 ✓');
+    }
+    document.getElementById('out').textContent = out.join('\n');
+    document.title = 'CLEAR OK';
+  } catch (e) {
+    document.getElementById('out').textContent = 'ERR ' + e.message + '\n' + e.stack;
+    document.title = 'CLEAR ERR';
+  }
+})();
+</script>
