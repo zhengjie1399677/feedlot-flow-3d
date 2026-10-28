@@ -78,3 +78,7 @@ bash tools/shot.sh 52 1920 1080 tools/shot.png
 
 - 每次都开一个全新的 Chrome profile，复用 profile 会缓存 `file://` 的 JS，改了代码看不到变化；
 - 用**真实 GPU** 后端截图（脚本里没有 `--use-angle=swiftshader`）。SwiftShader 会把着色器里的 NaN 画成透明，真实显卡上却是黑块——之前灯柱体积光的 `pow()` 底数取了负值，就是这么漏过去的。
+
+## 许可
+
+MIT。拿去随便用，商用、改、闭源分发都行，只要保留 LICENSE 里的版权声明即可（three.js 本体是 MIT，`vendor/three.min.js` 的版权归 three.js 作者）。
