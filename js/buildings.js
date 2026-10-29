@@ -114,10 +114,11 @@
   }
 
   /* 镜像排：几何绕自心转 180°（用旋转而不是负缩放，否则法线/绕序会反） */
-  function mirrorKit(kit, cx, cz) {
+  /* 把一棵 kit 子树整体绕 (cx,cz) 旋转 rot —— 用来做镜像牛舍和朝北的员工楼 */
+  function mirrorKit(kit, cx, cz, rot) {
     const pre = new THREE.Matrix4()
       .makeTranslation(cx, 0, cz)
-      .multiply(new THREE.Matrix4().makeRotationY(Math.PI))
+      .multiply(new THREE.Matrix4().makeRotationY(rot === undefined ? Math.PI : rot))
       .multiply(new THREE.Matrix4().makeTranslation(-cx, 0, -cz));
     return {
       add: function (geo, mat, matrix) {
@@ -945,9 +946,10 @@
   }
 
   /* ---------------- 员工办公楼 ---------------- */
-  function buildStaffOffice(kit, M, world) {
+  function buildStaffOffice(rawKit, M, world) {
     const O = L.market.office;
     const cx = O.cx, cz = O.cz, w = O.w, d = O.d;
+    const kit = O.rot ? mirrorKit(rawKit, cx, cz, O.rot) : rawKit;
     const zf = cz + d / 2;
     const H = 10.6;
 
@@ -960,19 +962,37 @@
     U.box(kit, M.wallCool, w + 0.4, 1.0, 0.3, cx, 0.8 + H + 0.62, zf - 0.2);
     U.box(kit, M.wallCool, w + 0.4, 1.0, 0.3, cx, 0.8 + H + 0.62, cz - d / 2 + 0.2);
 
-    // 三层窗（南立面）
+    // 三层窗（前后两个长立面都开窗，楼在路南侧、镜头从东南看过来）
     const bays = 11, bw = w / bays;
+    const zb = cz - d / 2;
     for (let f = 0; f < 3; f++) {
       const y = 2.2 + f * 3.3;
       for (let i = 0; i < bays; i++) {
         const x = cx - w / 2 + bw * (i + 0.5);
-        if (f === 0 && (i === 4 || i === 5 || i === 6)) continue;
-        U.box(kit, M.glass, bw - 1.05, 1.85, 0.14, x, y + 0.5, zf + 0.02);
-        U.box(kit, M.warmGlow, bw - 1.5, 1.5, 0.06, x, y + 0.5, zf + 0.1);
-        U.box(kit, M.steelLight, 0.14, 1.9, 0.2, x - (bw - 1.05) / 2, y + 0.5, zf + 0.06);
-        U.box(kit, M.steelLight, 0.14, 1.9, 0.2, x + (bw - 1.05) / 2, y + 0.5, zf + 0.06);
+        const frontDoor = f === 0 && (i === 4 || i === 5 || i === 6);
+        if (!frontDoor) {
+          U.box(kit, M.glass, bw - 1.05, 1.85, 0.14, x, y + 0.5, zf + 0.02);
+          U.box(kit, M.warmGlow, bw - 1.5, 1.5, 0.06, x, y + 0.5, zf + 0.1);
+          U.box(kit, M.steelLight, 0.14, 1.9, 0.2, x - (bw - 1.05) / 2, y + 0.5, zf + 0.06);
+          U.box(kit, M.steelLight, 0.14, 1.9, 0.2, x + (bw - 1.05) / 2, y + 0.5, zf + 0.06);
+        }
+        U.box(kit, M.glass, bw - 1.05, 1.85, 0.14, x, y + 0.5, zb - 0.02);
+        U.box(kit, M.warmGlow, bw - 1.5, 1.5, 0.06, x, y + 0.5, zb - 0.1);
+        U.box(kit, M.steelLight, 0.14, 1.9, 0.2, x - (bw - 1.05) / 2, y + 0.5, zb - 0.06);
+        U.box(kit, M.steelLight, 0.14, 1.9, 0.2, x + (bw - 1.05) / 2, y + 0.5, zb - 0.06);
       }
     }
+    // 背面（园区朝南那侧）也留个入口门廊与楼名
+    U.box(kit, M.glass, 7.2, 4.2, 0.16, cx, 2.5, zb - 0.04);
+    for (const px of [cx - 3.6, cx, cx + 3.6]) {
+      U.box(kit, M.steelLight, 0.2, 4.3, 0.2, px, 2.5, zb - 0.1);
+    }
+    sign(world, '员工办公楼', 'STAFF OFFICE · 综合管理', 10, 1.6, cx, 6.3, zb - 0.22, Math.PI, {
+      size: 88, subSize: 34, bg: 'rgba(9,12,15,0.92)', border: 'rgba(150,205,255,0.42)',
+      glow: 'rgba(120,180,255,0.28)', color: '#e6f1ff', subColor: 'rgba(175,205,235,0.8)',
+    });
+    glowPlane(world, 7.0, 3.4, cx, 2.5, zb - 0.3, Math.PI, 0xffc98a, 0.14);
+    world.pools.push({ x: cx, z: zb - 3.4, size: 18, warm: 0.85 });
     // 东西两侧条窗
     for (let f = 0; f < 3; f++) {
       const y = 2.2 + f * 3.3;
@@ -1053,6 +1073,87 @@
     }
   }
 
+  /* ---------------- 交易中心停车场 ---------------- */
+  function parkedCar(kit, M, x, z, rot, paint) {
+    const base = U.mat4(x, 0.24, z, 0, rot, 0);
+    const put = function (mat, w, h, d, px, py, pz, r) {
+      const g = U.roundedBox(w, h, d, r === undefined ? 0.06 : r);
+      g.applyMatrix4(U.mat4(px, py, pz));
+      g.applyMatrix4(base);
+      kit.add(g, mat);
+    };
+    put(M.plinth, 4.3, 0.34, 1.86, 0, 0.52, 0, 0.1);
+    put(paint, 3.9, 0.66, 1.8, 0, 0.86, 0, 0.24);
+    put(paint, 1.95, 0.6, 1.62, -0.15, 1.44, 0, 0.26);      // 车顶（跟车身同色，从上往下看才不是黑块）
+    put(M.glass, 1.9, 0.34, 1.66, -0.15, 1.3, 0, 0.1);      // 一圈车窗带
+    put(paint, 1.6, 0.16, 1.66, 1.5, 1.26, 0, 0.08);
+    put(M.plinth, 3.9, 0.12, 1.7, 0, 0.44, 0, 0.04);
+    for (const px of [1.32, -1.32]) {
+      for (const pz of [-0.8, 0.8]) {
+        const g = new THREE.CylinderGeometry(0.33, 0.33, 0.24, 12);
+        g.applyMatrix4(U.mat4(0, 0, 0, Math.PI / 2, 0, 0));
+        g.applyMatrix4(U.mat4(px, 0.38, pz));
+        g.applyMatrix4(base);
+        kit.add(g, M.plinth);
+      }
+    }
+  }
+
+  function buildParking(kit, M, world) {
+    const P = L.market.parking;
+    const st = P.stall || 2.7;
+    const midZ = (P.z0 + P.z1) / 2;
+    const aisle = P.aisle || 5.2;
+    const rowD = Math.min(5.2, (P.z1 - P.z0 - aisle) / 2);
+    const n = Math.floor((P.x1 - P.x0) / st);
+    const paints = [M.wall, M.galv, M.red, M.blue, M.steelLight, M.timberLight, M.wall, M.galv];
+
+    // 铺装与车位线
+    U.box(kit, M.asphalt, P.x1 - P.x0, 0.1, P.z1 - P.z0, (P.x0 + P.x1) / 2, 0.29, midZ, 0, 0, 0, 2);
+    for (let i = 0; i <= n; i++) {
+      const x = P.x0 + i * st;
+      U.box(kit, M.line, 0.14, 0.03, rowD - 0.5, x, 0.36, P.z0 + rowD / 2, 0, 0, 0, 0.02);
+      U.box(kit, M.line, 0.14, 0.03, rowD - 0.5, x, 0.36, P.z1 - rowD / 2, 0, 0, 0, 0.02);
+    }
+    U.box(kit, M.line, P.x1 - P.x0, 0.03, 0.14, (P.x0 + P.x1) / 2, 0.36, midZ - aisle / 2);
+    U.box(kit, M.line, P.x1 - P.x0, 0.03, 0.14, (P.x0 + P.x1) / 2, 0.36, midZ + aisle / 2);
+
+    // 车位上的车（按固定节奏留空位，看着像停了大半）
+    const order = [3, 1, 5, 2, 0, 4, 6, 2, 7, 0, 3, 5, 1, 4, 0, 6, 2, 7, 3, 1, 5, 0, 4, 2, 6, 3, 1, 0, 5, 2, 7, 4];
+    let k = 0;
+    for (let i = 0; i < n; i++) {
+      const x = P.x0 + st * (i + 0.5);
+      for (const half of [0, 1]) {
+        const z = half === 0 ? P.z0 + rowD / 2 - 0.15 : P.z1 - rowD / 2 + 0.15;
+        const rot = half === 0 ? 0 : Math.PI;
+        if ((i * 3 + half * 5) % 7 === 2) { k++; continue; }
+        parkedCar(kit, M, x, z, rot, paints[order[k % order.length]]);
+        k++;
+      }
+    }
+
+    // 车位灯 + 两个出入口
+    for (const lx of [P.x0 + 10, P.x1 - 10, P.x0 + 34, P.x1 - 34]) {
+      U.cyl(kit, M.steel, 0.08, 0.1, 5.0, 8, lx, 2.7, P.z1 - 1.0);
+      U.box(kit, M.lamp, 0.7, 0.16, 0.5, lx, 5.15, P.z1 - 1.0);
+      glowSprite(world, 0xffd7a0, 2.2, lx, 5.15, P.z1 - 1.0, 0.8);
+      world.pools.push({ x: lx, z: midZ, size: 12, warm: 0.8 });
+    }
+    sign(world, 'P 员工停车场', 'STAFF PARKING · 48 车位', 7.6, 1.5, (P.x0 + P.x1) / 2, 3.1, P.z1 + 1.2, 0, {
+      size: 72, subSize: 30, bg: 'rgba(8,12,14,0.9)', border: 'rgba(120,200,255,0.35)',
+      glow: 'rgba(90,180,255,0.2)', color: '#d6ecff',
+    });
+    // 入口花箱
+    for (const bx of [P.x0 - 3, P.x1 + 3]) {
+      U.box(kit, M.concreteTrough, 1.6, 0.6, 1.6, bx, 0.5, midZ, 0, 0, 0, 0.14);
+      U.box(kit, M.leafA, 1.35, 0.8, 1.35, bx, 1.0, midZ, 0, 0.4, 0, 0.3);
+    }
+    // 大厅门前几台临停
+    parkedCar(kit, M, -8, 15.4, Math.PI * 0.5, M.steelLight);
+    parkedCar(kit, M, 40, 15.4, Math.PI * 0.5, M.blue);
+    parkedCar(kit, M, 45.5, 15.4, Math.PI * 0.5, M.wall);
+  }
+
   /* ---------------- 入口 ---------------- */
   FL.buildBuildings = function (kit, M, world) {
     M.warmGlow.userData.noShadow = true;
@@ -1072,6 +1173,7 @@
     buildCompoundWall(kit, M, world);
     buildTradingCenter(kit, M, world);
     buildStaffOffice(kit, M, world);
+    buildParking(kit, M, world);
 
     // 机修车库挪到东南角，挂车停在员工车场
     buildWorkshop(kit, M, world, L.market.workshop.cx, L.market.workshop.cz);

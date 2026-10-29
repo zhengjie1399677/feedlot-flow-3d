@@ -81,7 +81,8 @@
       ramp: { x: 23, z: 1 },
       scale: { x: 50, z: 4 },
       lot: { x0: 82, x1: 104, z0: 3.5, z1: 14.5 },
-      office: { cx: 52, cz: 33, w: 44, d: 12 },
+      parking: { x0: 30, x1: 78, z0: 24, z1: 40, aisle: 5.2, stall: 2.7 },
+      office: { cx: 12, cz: 68, w: 46, d: 12, rot: Math.PI },
       workshop: { cx: 92, cz: 26 },
     },
 
