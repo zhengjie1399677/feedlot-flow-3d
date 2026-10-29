@@ -179,7 +179,8 @@
       document.title = 'h=' + hour.toFixed(2) +
         ' key=' + world.lights.moon.intensity.toFixed(2) + ' kc=' + world.lights.moon.color.getHexString() +
         ' hemi=' + world.lights.hemi.intensity.toFixed(2) +
-        ' piles=' + piles.length + ' s=' + (piles[0] ? piles[0].show.toFixed(2) + '/' + piles[0].mesh.scale.y.toFixed(2) : '-');
+        ' piles=' + piles.length + ' s=' + (piles[0] ? piles[0].show.toFixed(2) + '/' + piles[0].mesh.scale.y.toFixed(2) : '-') +
+        (function () { for (let i = 0; i < fleet.list.length; i++) { const v = fleet.list[i]; if (v.id === 'forage') return ' forage s=' + v.s.toFixed(0) + ' ld=' + v.loaded + ' dw=' + (v.dwellLeft || 0).toFixed(1); } return ''; })();
     }
     if (frames === 1) ui.reveal();
     frames++;

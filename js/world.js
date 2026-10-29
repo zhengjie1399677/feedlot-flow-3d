@@ -160,6 +160,8 @@
     M.red = S({ color: 0x8d3a30, roughness: 0.55 });
     M.blue = S({ color: 0x2e4d63, roughness: 0.55 });
     M.hay = S({ color: 0x8f7742, roughness: 1 });
+    // 交易栏圈地面：浅灰垫层，跟黄褐色的牛拉开（原来是黄的，牛也黄，糊成一片）
+    M.penPad = S({ map: T.concrete, color: 0xb3b3ad, roughness: 0.95 });
     M.bark = S({ color: 0x3a2c21, roughness: 0.95 });
     M.leafA = S({ color: 0x243a20, roughness: 0.95 });
     M.leafB = S({ color: 0x2f4a26, roughness: 0.95 });

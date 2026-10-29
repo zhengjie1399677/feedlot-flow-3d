@@ -441,6 +441,7 @@
         roll: 0,
         pitch: 0,
         cargo: built.cargo || null,
+        loaded: true,
         drumSpin: 0,
       };
       fleet.list.push(veh);
@@ -470,6 +471,7 @@
       if (!v.stops.length) {        // 兜底：没有停靠点的路线匀速绕行
         v.v = Math.min(v.vmax, v.v + ACC * dt);
         v.s = (v.s + v.v * dt) % len;
+        if (v.s < v.v * dt * 0.5) v.sWrap = true;
         return;
       }
       if (v.dwellLeft > 0) {
@@ -497,11 +499,21 @@
       v.v += Math.max(-a * dt, Math.min(a * dt, vd - v.v));
       if (v.v < 0.02) v.v = 0;
       v.s += v.v * dt;
-      if (v.s >= len) v.s -= len;
+      if (v.s >= len) { v.s -= len; v.sWrap = true; }
     }
 
     function stepSim(dt) {
       for (let i = 0; i < fleet.list.length; i++) advance(fleet.list[i], dt);
+      // 载货状态：在青贮窖卸完就空车，跑完一圈回到起点再装满
+      for (let i = 0; i < fleet.list.length; i++) {
+        const v = fleet.list[i];
+        if (!v.cargo) continue;
+        if (v.sWrap) { v.loaded = true; v.sWrap = false; }
+        const st = v.dwellLeft > 0 ? v.stops[v.si] : null;
+        if (st && /青贮/.test(String(st.label || '')) && (st.stop - v.dwellLeft) > st.stop * 0.35) {
+          v.loaded = false;
+        }
+      }
       for (let i = 0; i < fleet.list.length; i++) {
         const v = fleet.list[i];
         const px = v.x, pz = v.z;
@@ -660,12 +672,7 @@
           v.bed.rotation.x += (want - v.bed.rotation.x) * (1 - Math.exp(-sdt * 1.8));
         }
         // 草料：卸到一半就没货了（空车）
-        if (v.cargo) {
-          const st2 = v.dwell && v.stops[v.si] ? v.stops[v.si] : null;
-          const unload = !!st2 && /青贮/.test(String(st2.label || ''));
-          const spent = unload && (st2.stop - v.dwellLeft) > st2.stop * 0.35;
-          v.cargo.visible = !spent;
-        }
+        if (v.cargo) v.cargo.visible = v.loaded;
         // TMR 尾部出料门：投料时抬起
         if (v.gate) {
           const lbl = v.dwell && v.stops[v.si] ? String(v.stops[v.si].label || '') : '';

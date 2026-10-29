@@ -955,7 +955,7 @@
     const penW = P.w, penD = P.d, gx = P.gx, gz = P.gz;
     const totalW = P.cols * penW + (P.cols - 1) * gx;
     const totalD = P.rows * penD + (P.rows - 1) * gz;
-    U.box(kit, M.hay, totalW + 6, 0.1, totalD + 6, penX + totalW / 2, 0.27, penZ + totalD / 2, 0, 0, 0, 1.2);
+    U.box(kit, M.penPad, totalW + 6, 0.1, totalD + 6, penX + totalW / 2, 0.27, penZ + totalD / 2, 0, 0, 0, 1.2);
     for (let r = 0; r < P.rows; r++) {
       for (let c = 0; c < P.cols; c++) {
         const x0 = penX + c * (penW + gx), z0 = penZ + r * (penD + gz);
