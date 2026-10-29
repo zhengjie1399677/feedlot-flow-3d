@@ -265,8 +265,8 @@
     world.feedPiles.push({ mesh: pile, x: cx, z: tz, idx: b.idx, show: -1 });
 
     // 内部：饮水槽 / 栏杆 / 吊灯
-    U.box(kit, M.concreteTrough, 4.6, 0.72, 1.2, cx + 11, 0.95, cz + 5.6);
-    U.box(kit, M.water, 4.3, 0.06, 0.95, cx + 11, 1.3, cz + 5.6);
+    U.box(kit, M.concreteTrough, 4.6, 0.72, 1.2, cx + 11, 0.95, cz - 4.4);
+    U.box(kit, M.water, 4.3, 0.06, 0.95, cx + 11, 1.3, cz - 4.4);
     U.box(kit, M.steel, len - 2, 0.07, 0.07, cx, 1.25, cz - 6.2);
     U.box(kit, M.steel, len - 2, 0.07, 0.07, cx, 1.75, cz - 6.2);
     for (let i = 0; i <= 6; i++) {
@@ -291,10 +291,26 @@
     // 墙顶压边：剖视时这道深色带让"剖开"看起来是故意的，而不是忘了盖顶
     U.box(kit, M.steelLight, len + 0.16, 0.18, 0.4, cx, eave - 0.03, zf);
     U.box(kit, M.steelLight, len + 0.16, 0.18, 0.4, cx, eave - 0.03, zf - dep);
-    // 舍内地面：中间走道 + 两侧垫料
-    U.box(kit, M.barnPad, len - 2.4, 0.06, 2.6, cx, 0.82, cz, 0, 0, 0);
-    U.box(kit, M.barnStraw, len - 2.4, 0.05, 3.4, cx, 0.81, cz + 4.6);
-    U.box(kit, M.barnStraw, len - 2.4, 0.05, 3.4, cx, 0.81, cz - 4.6);
+    // 舍内地面：靠前一道采食站立带（混凝土，牛伸头过颈夹吃料），后面整片垫料休息区
+    // —— 舍内不走车，所以没有"车道"，只有牛的活动区
+    const standD = 2.8;                       // 采食站立带进深
+    const restZ0 = zb + 0.4;                  // 休息区后沿
+    const restZ1 = zf - standD - 0.3;         // 休息区前沿
+    const restD = restZ1 - restZ0;
+    const restC = (restZ0 + restZ1) / 2;
+    U.box(kit, M.barnPad, len - 2.4, 0.06, standD, cx, 0.82, zf - standD / 2 - 0.3, 0, 0, 0);
+    U.box(kit, M.barnStraw, len - 2.4, 0.05, restD, cx, 0.81, restC);
+    // 休息区里的横向隔栏：把整条休息区分成四栏
+    for (let p2 = 1; p2 <= 3; p2++) {
+      const px = cx - halfL + 1.2 + p2 * ((len - 2.4) / 4);
+      U.box(kit, M.steel, 0.09, 0.09, restD, px, 1.32, restC);
+      U.box(kit, M.steel, 0.09, 0.09, restD, px, 0.86, restC);
+      U.box(kit, M.steel, 0.11, 1.05, 0.11, px, 1.0, restZ0 + 0.6);
+      U.box(kit, M.steel, 0.11, 1.05, 0.11, px, 1.0, restZ1 - 0.6);
+    }
+    // 栏间水槽（贴着隔栏，牛抬头就能喝）
+    U.box(kit, M.concreteTrough, 0.9, 0.62, 1.1, cx - halfL + 1.2 + (len - 2.4) / 4 + 1.1, 0.86, restZ1 - 1.5);
+    U.box(kit, M.water, 0.72, 0.05, 0.9, cx - halfL + 1.2 + (len - 2.4) / 4 + 1.1, 1.16, restZ1 - 1.5);
     // 舍内顶部灯带（跟着夜色亮起）
     U.box(kit, M.warmGlow, len - 3.4, 0.1, 0.1, cx, eave - 0.55, cz + 2.2);
     U.box(kit, M.warmGlow, len - 3.4, 0.1, 0.1, cx, eave - 0.55, cz - 3.4);

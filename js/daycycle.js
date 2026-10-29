@@ -145,7 +145,7 @@
       }
       for (let i = 0; i < poolMats.length; i++) poolMats[i].opacity = poolBase[i] * (0.10 + 0.90 * nightF);
       for (let i = 0; i < sprites.length; i++) sprites[i].material.opacity = spriteBase[i] * (0.15 + 0.85 * nightF);
-      for (let i = 0; i < glowMats.length; i++) glowMats[i].emissiveIntensity = glowBase[i] * (0.34 + 0.66 * nightF);
+      for (let i = 0; i < glowMats.length; i++) glowMats[i].emissiveIntensity = glowBase[i] * (0.10 + 0.90 * nightF);
       if (world.coneMat) world.coneMat.uniforms.uOpacity.value = 0.16 * (0.10 + 0.90 * nightF);
       if (baseGlowMat) baseGlowMat.opacity = baseGlowBase * (0.30 + 0.70 * nightF);
 

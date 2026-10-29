@@ -283,24 +283,25 @@
     if (L.barns) {
       for (const b2 of L.barns) {
         const zf2 = b2.mirror ? b2.cz - b2.dep / 2 : b2.cz + b2.dep / 2;
-        for (let k = 0; k < 8; k++) {
-          const row = Math.floor(k / 4);
+        const sgn = b2.mirror ? 1 : -1;      // 由前脸往里走的方向
+        for (let k = 0; k < 12; k++) {
+          const row = Math.floor(k / 4);      // 休息区里三排
           const spot = {
-            x: b2.cx - 15 + (k % 4) * 10 + (rnd() - 0.5) * 1.8,
-            z: zf2 + (b2.mirror ? 2.8 : -2.8) - row * 2.6 + (rnd() - 0.5) * 0.5,
-            rot: (b2.mirror ? 1 : -1) * Math.PI / 2 + (rnd() - 0.5) * 0.7,
+            x: b2.cx - 15.5 + (k % 4) * 10.4 + (rnd() - 0.5) * 2.0,
+            z: zf2 + sgn * (4.6 + row * 3.7) + (rnd() - 0.5) * 0.9,
+            rot: (b2.mirror ? 1 : -1) * Math.PI / 2 + (rnd() - 0.5) * 1.5,
             scale: 0.92 + rnd() * 0.12,
             y: 0.84,
           };
-          if (k >= 5) {
+          if (k >= 9) {
             spot.walk = {
               mode: 'line',
               x0: b2.cx - 17.5,
               x1: b2.cx + 17.5,
-              z: zf2 + (b2.mirror ? 2.0 : -2.0),
+              z: zf2 + sgn * 1.9,
               speed: 0.42 + rnd() * 0.26,
             };
-            spot.x = spot.walk.x0 + 2 + (k - 5) * 11;
+            spot.x = spot.walk.x0 + 2 + (k - 9) * 11;
             spot.z = spot.walk.z;
             spot.y = 0.84;
           }

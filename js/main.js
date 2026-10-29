@@ -99,7 +99,7 @@
       // 屋顶收起时舍内失去遮蔽：把舍内地面压暗，读起来才像"室内"
       const M = world.mats || {};
       if (M.barnPad) M.barnPad.color.setHex(cut ? 0x6d6b64 : 0xb0aea6);
-      if (M.barnStraw) M.barnStraw.color.setHex(cut ? 0x6a6047 : 0x9b8d6a);
+      if (M.barnStraw) M.barnStraw.color.setHex(cut ? 0x665f50 : 0x8d8574);
     };
     applyCut(cutOn);
     if (ui.onCutaway) {

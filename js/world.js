@@ -166,18 +166,22 @@
     // 交易栏圈地面：浅灰垫层，跟黄褐色的牛拉开（原来是黄的，牛也黄，糊成一片）
     M.penPad = S({ map: T.concrete, color: 0xb3b3ad, roughness: 0.95 });
     M.barnPad = S({ map: T.concrete, color: 0xb0aea6, roughness: 0.96 });
-    M.barnStraw = S({ color: 0x9b8d6a, roughness: 1 });
+    M.barnStraw = S({ color: 0x8d8574, roughness: 1 });
     M.bark = S({ color: 0x3a2c21, roughness: 0.95 });
     M.leafA = S({ color: 0x243a20, roughness: 0.95 });
     M.leafB = S({ color: 0x2f4a26, roughness: 0.95 });
-    M.lamp = new THREE.MeshBasicMaterial({ color: new THREE.Color(0, 0, 0) });
-    M.lamp.color.setRGB(2.4, 1.55, 0.86);
-    M.warmGlow = new THREE.MeshBasicMaterial({ color: new THREE.Color(0, 0, 0) });
-    M.warmGlow.color.setRGB(1.6, 0.9, 0.42);
-    M.redBeam = new THREE.MeshBasicMaterial({ color: new THREE.Color(0, 0, 0) });
-    M.redBeam.color.setRGB(2.4, 0.3, 0.22);
-    M.waterGlow = new THREE.MeshBasicMaterial({ color: new THREE.Color(0, 0, 0) });
-    M.waterGlow.color.setRGB(0.4, 0.8, 1.2);
+    // 自发光件：用 StandardMaterial 的 emissive，才能被昼夜循环按 nightF 调亮度
+    // （BasicMaterial 没有 emissiveIntensity，白天会和夜里一样亮，非常假）
+    const emis = function (r, g, bl, i) {
+      return new THREE.MeshStandardMaterial({
+        color: 0x0b0906, emissive: new THREE.Color(r, g, bl),
+        emissiveIntensity: i, roughness: 1, metalness: 0,
+      });
+    };
+    M.lamp = emis(2.4, 1.55, 0.86, 1.0);
+    M.warmGlow = emis(1.6, 0.9, 0.42, 1.0);
+    M.redBeam = emis(2.4, 0.3, 0.22, 1.0);
+    M.waterGlow = emis(0.4, 0.8, 1.2, 1.0);
     return M;
   }
 
