@@ -1,15 +1,20 @@
 /* 牛群：polyfork.dev "Cow base"（CC0）。
    - 走 http 时：GLTFLoader 载入 vendor/models/cow_polyfork.glb，SkeletonUtils 克隆，
-     每头一个 AnimationMixer 播 Idle —— 真正的骨骼动画。
-   - file:// 打开或加载失败时：退回 js/cow-asset.js 里预烘的 6 帧顶点（同样会动）。
-   两条路都不需要构建工具。 */
+     每头一个 AnimationMixer —— 站着的播 Idle，走动的播 Walk 并在舍内/栏圈里移动。
+   - file:// 打开或加载失败时：退回 js/cow-asset.js 里预烘的 6 帧顶点（会呼吸，但不走动）。 */
 (function (root) {
   const FL = root.FL = root.FL || {};
   const MODEL = 'vendor/models/cow_polyfork.glb';
+  const YAW_FIX = 0;          // 若发现牛倒着走，这里补 Math.PI
 
   function bytes(buf, off, n) { return buf.slice(off, off + n); }
 
-  /* 把黑白花改成西门塔尔的黄白花：暗部压成红棕、亮部提成奶油色 */
+  /* 黑白花 → 西门塔尔的黄褐白花：按顶点亮度重映射 */
+  function remapColor(c, brown, cream) {
+    const lum = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+    c.lerp(lum < 0.30 ? brown : cream, 0.92);
+  }
+
   function recolor(rootObj) {
     const brown = new THREE.Color(0.050, 0.020, 0.009);
     const cream = new THREE.Color(0.320, 0.140, 0.050);
@@ -27,8 +32,7 @@
       }
       for (let i = 0; i < col.count; i++) {
         c.fromBufferAttribute(col, i);
-        const lum = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
-        c.lerp(lum < 0.30 ? brown : cream, 0.92);
+        remapColor(c, brown, cream);
         col.setXYZ(i, c.r, c.g, c.b);
       }
       col.needsUpdate = true;
@@ -43,14 +47,22 @@
 
     let baked = null;
     const mixers = [];
+    const walkers = [];
     let lastT = 0;
 
-    /* ---------- 方案 A：运行时 GLTF + 蒙皮 ---------- */
+    /* ---------- 方案 A：运行时 GLTF + 骨骼 ---------- */
     function buildRuntime(loader, cloneSkinned) {
       loader.load(MODEL, function (gltf) {
         const src = gltf.scene;
         recolor(src);
-        const clip = (gltf.animations || []).find(function (c) { return /Idle/i.test(c.name); }) || gltf.animations[0];
+        const anims = gltf.animations || [];
+        const clipOf = function (re, fallback) {
+          const c = anims.find(function (a) { return re.test(a.name); });
+          return c || fallback || anims[0];
+        };
+        const cIdle = clipOf(/idle/i, anims[0]);
+        const cWalk = clipOf(/walk/i, cIdle);
+
         const holder = new THREE.Group();
         for (let i = 0; i < spots.length; i++) {
           const s = spots[i];
@@ -58,13 +70,24 @@
           inst.position.set(s.x, s.y || 0.22, s.z);
           inst.rotation.y = s.rot || 0;
           inst.scale.setScalar((s.scale || 1) * 0.92);
-          if (clip) {
+          if (cIdle) {
             const mx = new THREE.AnimationMixer(inst);
-            const act = mx.clipAction(clip);
-            act.play();
-            act.time = ((i * 0.37) % 1) * clip.duration;
-            mx.timeScale = 0.75 + ((i * 29) % 100) / 260;
+            const idle = mx.clipAction(cIdle);
+            idle.play();
+            idle.time = ((i * 0.37) % 1) * cIdle.duration;
+            mx.timeScale = 0.85 + ((i * 29) % 100) / 300;
             mixers.push(mx);
+            if (s.walk) {
+              const walk = mx.clipAction(cWalk);
+              walk.play();
+              walk.setEffectiveWeight(0);
+              walk.time = ((i * 0.61) % 1) * cWalk.duration;
+              walk.timeScale = 0.9 + ((i * 17) % 100) / 400;
+              walkers.push({
+                inst: inst, idle: idle, walk: walk, cfg: s.walk,
+                t: (i * 0.137) % 1, dir: (i % 2) ? 1 : -1, pause: 0, moving: false,
+              });
+            }
           }
           holder.add(inst);
         }
@@ -75,6 +98,49 @@
       }, undefined, function (e) {
         console.warn('牛模型加载失败，退回烘焙版本', e);
       });
+    }
+
+    function setMoving(w, moving) {
+      if (w.moving === moving) return;
+      w.moving = moving;
+      const to = moving ? w.walk : w.idle;
+      const from = moving ? w.idle : w.walk;
+      to.enabled = true;
+      to.setEffectiveWeight(1);
+      from.crossFadeTo(to, 0.35, false);
+      if (!moving) w.pause = 0.9 + Math.random() * 1.8;
+    }
+
+    function stepWalkers(dt) {
+      for (let i = 0; i < walkers.length; i++) {
+        const w = walkers[i];
+        const c = w.cfg;
+        const o = w.inst;
+        if (c.mode === 'circle') {
+          if (!w.moving) setMoving(w, true);
+          w.t = (w.t + dt * c.speed / (2 * Math.PI * c.r)) % 1;
+          const a = w.t * Math.PI * 2;
+          o.position.x = c.cx + Math.cos(a) * c.r;
+          o.position.z = c.cz + Math.sin(a) * c.r;
+          o.rotation.y = -a + Math.PI / 2 + YAW_FIX;
+          continue;
+        }
+        // 直线往返（牛舍采食通道）
+        if (w.pause > 0) {
+          w.pause -= dt;
+          if (w.moving) setMoving(w, false);
+          if (w.pause <= 0) setMoving(w, true);
+          continue;
+        }
+        if (!w.moving) setMoving(w, true);
+        const span = c.x1 - c.x0;
+        w.t += (dt * c.speed / span) * w.dir;
+        if (w.t > 1) { w.t = 1; w.dir = -1; w.pause = 0.8 + Math.random(); }
+        if (w.t < 0) { w.t = 0; w.dir = 1; w.pause = 0.8 + Math.random(); }
+        o.position.x = c.x0 + span * w.t;
+        o.position.z = c.z;
+        o.rotation.y = (w.dir > 0 ? Math.PI / 2 : -Math.PI / 2) + YAW_FIX;
+      }
     }
 
     /* ---------- 方案 B：预烘 6 帧 ---------- */
@@ -93,8 +159,7 @@
         const cream = new THREE.Color(0.320, 0.140, 0.050);
         for (let i = 0; i < A.v; i++) {
           c.fromBufferAttribute(colorAttr, i);
-          const lum = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
-          c.lerp(lum < 0.30 ? brown : cream, 0.92);
+          remapColor(c, brown, cream);
           colorAttr.setXYZ(i, c.r, c.g, c.b);
         }
       }
@@ -164,12 +229,13 @@
     group.userData.mode = baked ? 'baked' : 'none';
 
     group.userData.update = function (time) {
+      const dt = lastT ? Math.min(0.06, Math.max(0, time - lastT)) : 0.016;
+      lastT = time;
       if (baked && baked.group.visible) baked.update(time);
       if (mixers.length) {
-        const dt = lastT ? Math.min(0.05, Math.max(0, time - lastT)) : 0.016;
+        if (walkers.length) stepWalkers(dt);
         for (let i = 0; i < mixers.length; i++) mixers[i].update(dt);
       }
-      lastT = time;
     };
 
     // 等 GLTFLoader 就绪（module 脚本延迟执行），再走真·蒙皮那条路
@@ -188,7 +254,7 @@
     return group;
   };
 
-  /* 栏圈里每栏 3 头牛 + 每栋牛舍舍内 8 头 */
+  /* 栏圈每栏 3 头（1 头绕圈走），牛舍舍内每栋 8 头（3 头沿栏前走道来回走） */
   FL.herdSpots = function (L) {
     const P = L.market && L.market.pens;
     const out = [];
@@ -198,13 +264,18 @@
       for (let c = 0; c < P.cols; c++) {
         for (let r = 0; r < P.rows; r++) {
           const x0 = P.x0 + c * (P.w + P.gx), z0 = P.z0 + r * (P.d + P.gz);
+          const pcx = x0 + P.w / 2, pcz = z0 + P.d / 2;
           for (let k = 0; k < 3; k++) {
-            out.push({
+            const spot = {
               x: x0 + P.w * (0.28 + 0.22 * k) + (rnd() - 0.5) * 0.6,
               z: z0 + P.d * (0.35 + 0.18 * k) + (rnd() - 0.5) * 0.6,
               rot: rnd() * Math.PI * 2,
               scale: 0.92 + rnd() * 0.16,
-            });
+            };
+            if (k === 2) {
+              spot.walk = { mode: 'circle', cx: pcx, cz: pcz, r: 2.1, speed: 0.40 + rnd() * 0.16 };
+            }
+            out.push(spot);
           }
         }
       }
@@ -213,13 +284,27 @@
       for (const b2 of L.barns) {
         const zf2 = b2.mirror ? b2.cz - b2.dep / 2 : b2.cz + b2.dep / 2;
         for (let k = 0; k < 8; k++) {
-          out.push({
+          const row = Math.floor(k / 4);
+          const spot = {
             x: b2.cx - 15 + (k % 4) * 10 + (rnd() - 0.5) * 1.8,
-            z: zf2 + (b2.mirror ? 2.8 : -2.8) - Math.floor(k / 4) * 2.6 + (rnd() - 0.5) * 0.5,
+            z: zf2 + (b2.mirror ? 2.8 : -2.8) - row * 2.6 + (rnd() - 0.5) * 0.5,
             rot: (b2.mirror ? 1 : -1) * Math.PI / 2 + (rnd() - 0.5) * 0.7,
             scale: 0.92 + rnd() * 0.12,
             y: 0.84,
-          });
+          };
+          if (k >= 5) {
+            spot.walk = {
+              mode: 'line',
+              x0: b2.cx - 17.5,
+              x1: b2.cx + 17.5,
+              z: zf2 + (b2.mirror ? 2.0 : -2.0),
+              speed: 0.42 + rnd() * 0.26,
+            };
+            spot.x = spot.walk.x0 + 2 + (k - 5) * 11;
+            spot.z = spot.walk.z;
+            spot.y = 0.84;
+          }
+          out.push(spot);
         }
       }
     }
