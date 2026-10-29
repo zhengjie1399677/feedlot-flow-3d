@@ -212,19 +212,9 @@
     for (let i = 0; i < 7; i++) {
       U.box(kit, M.yellow, 3.4, 0.02, 0.34, wb.x - 15, 0.242, wb.z - 6 + i * 2, 0, 0, 0);
     }
-    // 停车位（机修车间东侧，挂车停放带）
-    const lot = L.market.lot;
-    for (const pz of [lot.z0, lot.z1]) {
-      U.box(kit, M.line, lot.x1 - lot.x0, 0.02, 0.14, (lot.x0 + lot.x1) / 2, 0.242, pz);
-    }
-    for (const px of [lot.x0, lot.x1]) {
-      U.box(kit, M.line, 0.14, 0.02, lot.z1 - lot.z0, px, 0.242, (lot.z0 + lot.z1) / 2);
-    }
-    for (let i = 1; i < 3; i++) {
-      const px = lot.x0 + ((lot.x1 - lot.x0) * i) / 3;
-      U.box(kit, M.line, 0.12, 0.02, lot.z1 - lot.z0, px, 0.242, (lot.z0 + lot.z1) / 2);
-    }
+  }
 
+  function buildFlows(kit, M, world) {
     // 流向光带
     for (const f of L.flow) {
       const geo = ribbonGeo(f.pts, f.width, 0.262, { uv: 8 });
@@ -619,6 +609,7 @@
     const kit = new U.Kit();
     buildGround(kit, M);
     buildRoads(kit, M, world);
+    buildFlows(kit, M, world);
     buildFences(kit, M);
     FL.buildBuildings(kit, M, world);
     buildProps(kit, M, world);

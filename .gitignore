@@ -1,3 +1,4 @@
 tools/profiles/
 tools/*.png
 tools/*.bak.js
+tools/_*.js
