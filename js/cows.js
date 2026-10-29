@@ -1,5 +1,5 @@
-/* 牛群：把预处理好的牛模型（单网格 + 顶点色，polyfork.dev "Cow base"，CC0）
-   以 InstancedMesh 撒进栏圈与牛舍。整群只占 1 个 draw call。 */
+/* 牛群：polyfork.dev "Cow base"（CC0）。模型已把 Idle 动画烘成 6 帧顶点，
+   运行时用 6 个 InstancedMesh 轮换帧号——不需要蒙皮、不解析 GLTF、纯静态文件。 */
 (function (root) {
   const FL = root.FL = root.FL || {};
 
@@ -15,27 +15,34 @@
     for (let i = 0; i < bin.length; i++) raw[i] = bin.charCodeAt(i);
     const buf = raw.buffer;
 
-    // 布局：position | normal | color | index
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(bytes(buf, 0, A.v * 12)), 3));
-    g.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(bytes(buf, A.oN, A.v * 12)), 3));
-    if (A.oC != null) {
-      g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(bytes(buf, A.oC, A.v * 12)), 3));
-    }
-    g.setIndex(new THREE.BufferAttribute(new Uint32Array(bytes(buf, A.oI, A.ic * 4)), 1));
-    g.computeBoundingSphere();
+    // 共享属性：顶点色 / 索引（法线每帧由顶点位置重算）
+    const colorAttr = new THREE.BufferAttribute(new Float32Array(bytes(buf, A.oC, A.v * 12)), 3);
+    const indexAttr = new THREE.BufferAttribute(new Uint32Array(bytes(buf, A.oI, A.ic * 4)), 1);
 
+    // 西门塔尔是黄白花：把底色往暖黄压，白斑变奶油黄、深斑变棕
     const mat = new THREE.MeshStandardMaterial({
-      roughness: 0.9, metalness: 0.02, side: THREE.DoubleSide,
-      vertexColors: A.oC != null,
-      color: A.oC != null ? 0xffffff : 0xd8c8a8,
+      color: 0xd2ab7e, roughness: 0.92, metalness: 0.02, side: THREE.DoubleSide, vertexColors: true,
     });
 
     const group = new THREE.Group();
     group.name = 'herd';
-    const inst = new THREE.InstancedMesh(g, mat, spots.length);
-    inst.castShadow = true;
-    inst.receiveShadow = true;
+
+    const frames = [];
+    for (let f = 0; f < A.nf; f++) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(bytes(buf, A.oF[f], A.v * 12)), 3));
+      g.setAttribute('color', colorAttr);
+      g.setIndex(indexAttr);
+      g.computeVertexNormals();
+      g.computeBoundingSphere();
+      const inst = new THREE.InstancedMesh(g, mat, spots.length);
+      inst.castShadow = true;
+      inst.receiveShadow = true;
+      inst.count = 0;
+      inst.frustumCulled = false;
+      group.add(inst);
+      frames.push(inst);
+    }
 
     const m4 = new THREE.Matrix4();
     const q = new THREE.Quaternion();
@@ -43,27 +50,49 @@
     const pos = new THREE.Vector3();
     const scl = new THREE.Vector3();
     const tmpCol = new THREE.Color();
+
     for (let i = 0; i < spots.length; i++) {
       const s = spots[i];
-      pos.set(s.x + (s.dx || 0), s.y || 0.22, s.z + (s.dz || 0));
-      q.setFromAxisAngle(up, s.rot || 0);
-      const k = s.scale || 1;
+      const k = (s.scale || 1) * 0.92;
       scl.set(k, k, k);
+      q.setFromAxisAngle(up, s.rot || 0);
+      pos.set(s.x + (s.dx || 0), s.y || 0.22, s.z + (s.dz || 0));
       m4.compose(pos, q, scl);
-      inst.setMatrixAt(i, m4);
-      // 每头深浅略有差别，整群不至于像复制粘贴
+      s.mat = m4.clone();
+      s.phase = (i * 0.37) % 1;
+      s.speed = 0.9 + ((i * 29) % 100) / 260;
       const t = 0.78 + ((i * 37) % 100) / 100 * 0.34;
       tmpCol.setRGB(t, t * (0.96 + ((i * 13) % 10) / 120), t * 0.94);
-      inst.setColorAt(i, tmpCol);
+      s.col = tmpCol.clone();
     }
-    inst.instanceMatrix.needsUpdate = true;
-    if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
-    group.add(inst);
+
+    const cursor = new Int32Array(A.nf);
+    function update(time) {
+      cursor.fill(0);
+      for (let i = 0; i < spots.length; i++) {
+        const s = spots[i];
+        const ph = ((time * s.speed * 0.16) + s.phase) % 1;
+        const f = Math.min(A.nf - 1, Math.floor(ph * A.nf));
+        const inst = frames[f];
+        const n = cursor[f];
+        inst.setMatrixAt(n, s.mat);
+        inst.setColorAt(n, s.col);
+        cursor[f] = n + 1;
+      }
+      for (let f = 0; f < A.nf; f++) {
+        frames[f].count = cursor[f];
+        frames[f].instanceMatrix.needsUpdate = true;
+        if (frames[f].instanceColor) frames[f].instanceColor.needsUpdate = true;
+      }
+    }
+
+    update(0);
     scene.add(group);
+    group.userData.update = update;
     return group;
   };
 
-  /* 栏圈里每栏 3 头牛 + 每栋牛舍舍内 4 头 */
+  /* 栏圈里每栏 3 头牛 + 每栋牛舍舍内 8 头 */
   FL.herdSpots = function (L) {
     const P = L.market && L.market.pens;
     const out = [];

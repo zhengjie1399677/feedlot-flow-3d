@@ -76,13 +76,13 @@
 
   const camera = new THREE.PerspectiveCamera(36, root.innerWidth / Math.max(1, root.innerHeight), 4, 3400);
 
-  let world, fleet, rig, pipe, ui, sky, day;
+  let world, fleet, rig, pipe, ui, sky, day, herd;
   try {
     FL.createEnvironment(scene, renderer);
     world = FL.buildWorld(scene);
     sky = FL.createSky(scene, world);
     fleet = FL.buildFleet(scene);
-    if (FL.buildHerd) FL.buildHerd(scene, FL.herdSpots(FL.LAYOUT || window.LAYOUT || {}));
+    if (FL.buildHerd) herd = FL.buildHerd(scene, FL.herdSpots(FL.LAYOUT || window.LAYOUT || {}));
     rig = FL.createCameraRig(camera, canvas);
     const camId = q.get('cam');
     const known = rig.presets && rig.presets.some(function (p) { return p.id === camId; });
@@ -152,6 +152,7 @@
     }
 
     fleet.update(fixed != null ? 0 : dt);
+    if (herd && herd.userData.update) herd.userData.update(simTime);
 
     // 料槽：TMR 刚喂过的舍最满，绕一圈回来前逐渐见底
     if (tmrVeh && piles.length) {
