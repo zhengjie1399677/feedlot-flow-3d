@@ -142,6 +142,8 @@
     M.wallCool = S({ map: T.concrete, color: 0x9aa6a8, roughness: 0.9 });
     M.wallDark = S({ map: T.corrugated, color: 0x899da4, roughness: 0.6, metalness: 0.3 });
     M.roof = S({ map: T.roof, color: 0xb06c48, roughness: 0.6, metalness: 0.22 });
+    M.roofSouth = S({ map: T.roof, color: 0x8a4f45, roughness: 0.62, metalness: 0.2 });
+    M.skylight = S({ map: T.roof, color: 0xd3e2ea, roughness: 0.28, metalness: 0.18 });
     M.roofPlant = S({ map: T.roof, color: 0x9fb3bb, roughness: 0.5, metalness: 0.35 });
     M.timber = S({ color: 0x54402f, roughness: 0.85 });
     M.timberLight = S({ color: 0x8a6a4a, roughness: 0.85 });

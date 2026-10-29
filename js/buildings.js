@@ -164,6 +164,7 @@
     const halfL = len / 2, halfD = dep / 2;
     const zf = cz + halfD, zb = cz - halfD;
     const eave = 6.5, ridge = 10.1;
+    const roofMat = mir ? M.roofSouth : M.roof;
     const y0 = 0.42;
     const doorW = 6.2, doorH = 4.9;
     const doorZ = cz - 3.2;
@@ -207,9 +208,22 @@
     const rise = ridge - eave;
     const slopeLen = Math.hypot(slopeH, rise) + 0.25;
     const ang = Math.atan2(rise, slopeH);
-    U.box(kit, M.roof, len + 1.8, 0.22, slopeLen, cx, (eave + ridge) / 2, cz + slopeH / 2, ang, 0, 0);
-    U.box(kit, M.roof, len + 1.8, 0.22, slopeLen, cx, (eave + ridge) / 2, cz - slopeH / 2, -ang, 0, 0);
-    U.box(kit, M.roof, len + 2.0, 0.3, 0.62, cx, ridge + 0.12, cz, 0, 0, 0);
+    U.box(kit, roofMat, len + 1.8, 0.22, slopeLen, cx, (eave + ridge) / 2, cz + slopeH / 2, ang, 0, 0);
+    U.box(kit, roofMat, len + 1.8, 0.22, slopeLen, cx, (eave + ridge) / 2, cz - slopeH / 2, -ang, 0, 0);
+    U.box(kit, roofMat, len + 2.0, 0.3, 0.62, cx, ridge + 0.12, cz, 0, 0, 0);
+    // 屋脊通风器：抬高的百叶脊
+    U.box(kit, M.galv, len - 1.2, 0.62, 1.06, cx, ridge + 0.45, cz, 0, 0, 0, 0.06);
+    U.box(kit, M.steel, len - 1.0, 0.12, 1.22, cx, ridge + 0.13, cz);
+    for (let s2 = 0; s2 < 3; s2++) {
+      U.box(kit, M.steel, len - 1.5, 0.07, 0.07, cx, ridge + 0.30 + s2 * 0.15, cz + 0.5);
+      U.box(kit, M.steel, len - 1.5, 0.07, 0.07, cx, ridge + 0.30 + s2 * 0.15, cz - 0.5);
+    }
+    U.box(kit, roofMat, len - 0.5, 0.15, 1.28, cx, ridge + 0.80, cz);
+    // 采光带：南坡每跨一条
+    for (let s3 = 0; s3 < 7; s3++) {
+      const sx = cx - halfL + 3.4 + s3 * ((len - 6.8) / 6);
+      U.box(kit, M.skylight, 2.4, 0.1, slopeLen * 0.60, sx, (eave + ridge) / 2 + 0.12, cz + slopeH / 2, ang, 0, 0);
+    }
     // 檐口
     U.box(kit, M.timber, len + 2.0, 0.4, 0.22, cx, eave + 0.04, zf + o + 0.02);
     U.box(kit, M.timber, len + 2.0, 0.4, 0.22, cx, eave + 0.04, zb - o - 0.02);
@@ -228,6 +242,8 @@
     // 卷起的遮阳帘
     const roll = new THREE.CylinderGeometry(0.26, 0.26, len - 1.6, 10);
     kit.add(roll, M.tarp, U.mat4(cx, eave - 1.05, zf + 0.15, 0, 0, Math.PI / 2));
+    // 半开的卷帘：留出一截让颈夹和栏内露出来
+    U.box(kit, M.tarp, len - 1.9, 1.3, 0.05, cx, eave - 1.05 - 0.68, zf + 0.13);
 
     // 料槽
     const tz = zf + 1.2;
@@ -264,6 +280,9 @@
       kit.add(bulb, M.lamp, U.mat4(lx, 5.42, cz, 0, 0, 0));
       glowSprite(world, 0xffc180, 3.4, mx(lx), 5.35, cz, 0.4);
     }
+    // 舍内顶部灯带（跟着夜色亮起）
+    U.box(kit, M.warmGlow, len - 3.4, 0.1, 0.1, cx, eave - 0.55, cz + 2.2);
+    U.box(kit, M.warmGlow, len - 3.4, 0.1, 0.1, cx, eave - 0.55, cz - 3.4);
     // 室内地面光斑
     world.pools.push({ x: cx, z: mz(cz), size: 34, warm: 1 });
 

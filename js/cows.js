@@ -43,7 +43,7 @@
 
       for (let i = 0; i < spots.length; i++) {
         const s = spots[i];
-        pos.set(s.x + (s.dx || 0), 0.22, s.z + (s.dz || 0));
+        pos.set(s.x + (s.dx || 0), s.y || 0.22, s.z + (s.dz || 0));
         q.setFromAxisAngle(up, s.rot || 0);
         const k = s.scale || 1;
         scl.set(k, k, k);
@@ -74,6 +74,20 @@
             z: z0 + P.d * (0.35 + 0.18 * k) + (rnd() - 0.5) * 0.6,
             rot: rnd() * Math.PI * 2,
             scale: 0.92 + rnd() * 0.16,
+          });
+        }
+      }
+    }
+    if (L.barns) {
+      for (const b2 of L.barns) {
+        const zf2 = b2.mirror ? b2.cz - b2.dep / 2 : b2.cz + b2.dep / 2;
+        for (let k = 0; k < 4; k++) {
+          out.push({
+            x: b2.cx - 13 + k * 8.6 + (rnd() - 0.5) * 1.6,
+            z: zf2 + (b2.mirror ? 2.6 : -2.6) - (k % 2) * 1.6,
+            rot: (b2.mirror ? -1 : 1) * Math.PI / 2 + (rnd() - 0.5) * 0.5,
+            scale: 0.94 + rnd() * 0.1,
+            y: 0.84,
           });
         }
       }
