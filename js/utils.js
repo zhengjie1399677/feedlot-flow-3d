@@ -109,6 +109,40 @@
     return c;
   }
 
+  // 场院脏迹：透明的深色斑块，叠在地面上当"用旧了"的痕迹
+  function grunge() {
+    const S = 256;
+    const c = makeCanvas(S);
+    const ctx = c.getContext('2d');
+    const rand = U.rng(4177);
+    ctx.clearRect(0, 0, S, S);
+    for (let i = 0; i < 46; i++) {
+      const x = rand() * S, y = rand() * S;
+      const r = 8 + rand() * 46;
+      const a = 0.06 + rand() * 0.16;
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, 'rgba(38,32,25,' + a.toFixed(3) + ')');
+      g.addColorStop(0.55, 'rgba(40,34,27,' + (a * 0.55).toFixed(3) + ')');
+      g.addColorStop(1, 'rgba(40,34,27,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // 几道擦痕
+    for (let i = 0; i < 9; i++) {
+      const x = rand() * S, y = rand() * S;
+      const len = 30 + rand() * 90, ang = rand() * Math.PI;
+      ctx.strokeStyle = 'rgba(34,29,23,' + (0.05 + rand() * 0.09).toFixed(3) + ')';
+      ctx.lineWidth = 1 + rand() * 3.5;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + Math.cos(ang) * len, y + Math.sin(ang) * len);
+      ctx.stroke();
+    }
+    return c;
+  }
+
   function concrete() {
     const S = 512;
     const c = makeCanvas(S);
@@ -271,6 +305,7 @@
     const T = U.textures;
     if (T.ready) return T;
     T.asphalt = makeTexture(asphalt(), { repeat: [1, 1] });
+    T.grunge = makeTexture(grunge(), { repeat: [1, 1], transparent: true });
     T.concrete = makeTexture(concrete(), { repeat: [1, 1] });
     T.concreteDark = makeTexture(concreteDark(), { repeat: [1, 1] });
     T.grass = makeTexture(grass(), { repeat: [8, 8] });

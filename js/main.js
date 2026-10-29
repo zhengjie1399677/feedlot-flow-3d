@@ -77,6 +77,7 @@
   const camera = new THREE.PerspectiveCamera(36, root.innerWidth / Math.max(1, root.innerHeight), 4, 3400);
 
   let world, fleet, rig, pipe, ui, sky, day, herd;
+  let cutUpdate = null;   // 幽灵屋顶的每帧插值（在 try 块里赋值，frame 在外面用）
   try {
     FL.createEnvironment(scene, renderer);
     world = FL.buildWorld(scene);
@@ -92,16 +93,45 @@
     pipe = FL.createPipeline(renderer, { enabled: fxOn });
     day = FL.createDay(scene, world, sky, pipe);
     ui = uiOn ? FL.createUI(fleet, rig) : { update: function () {}, reveal: function () {}, setCutaway: function () {}, onCutaway: function () {} };
-    // 剖视：默认收起牛舍屋顶（?roof=1 保留屋顶），与 UI 是否开启无关
-    const cutOn = q.get('roof') !== '1';
+    // 剖视 = 幽灵屋顶：屋顶不消失，而是淡成半透明，既保住体量又能看见舍内
+    // 屋顶材质和其他建筑共用，先克隆一份专用，避免整场跟着变透明
+    const roofMats = [];
+    if (world.barnRoofs) {
+      const swap = new Map();
+      world.barnRoofs.traverse(function (o) {
+        if (!o.isMesh || !o.material) return;
+        let cl = swap.get(o.material);
+        if (!cl) {
+          cl = o.material.clone();
+          cl.transparent = true;
+          cl.opacity = 1;
+          swap.set(o.material, cl);
+          roofMats.push(cl);
+        }
+        o.material = cl;
+        o.castShadow = true;      // 半透明也照样投影，舍内才是暗的
+      });
+    }
+    let roofGhost = 0;
+    let roofGhostTarget = 0;
+    const cutOn = q.get('cut') === '1';   // 默认盖屋顶；?cut=1 直接进剖视
     const applyCut = function (cut) {
-      if (world.barnRoofs) world.barnRoofs.visible = !cut;
-      // 屋顶收起时舍内失去遮蔽：把舍内地面压暗，读起来才像"室内"
-      const M = world.mats || {};
-      if (M.barnPad) M.barnPad.color.setHex(cut ? 0x6d6b64 : 0xb0aea6);
-      if (M.barnStraw) M.barnStraw.color.setHex(cut ? 0x665f50 : 0x8d8574);
+      roofGhostTarget = cut ? 1 : 0;
+      if (world.barnRoofs) world.barnRoofs.visible = true;
     };
     applyCut(cutOn);
+    cutUpdate = function (dt) {
+      roofGhost += (roofGhostTarget - roofGhost) * Math.min(1, dt * 4.0);
+      if (!roofMats.length) return;
+      const o = 1 - 0.76 * roofGhost;
+      const solid = roofGhost < 0.12;
+      for (let i = 0; i < roofMats.length; i++) {
+        const m = roofMats[i];
+        m.opacity = o;
+        m.depthWrite = solid;
+        m.needsUpdate = false;
+      }
+    };
     if (ui.onCutaway) {
       ui.onCutaway(applyCut);
       ui.setCutaway(cutOn);
@@ -140,6 +170,7 @@
     const dt = Math.min(Math.max(0, (now - last) / 1000), 0.05);
     last = now;
     if (fixed == null) simTime += dt;
+    if (cutUpdate) cutUpdate(dt);
 
     for (let i = 0; i < world.flows.length; i++) {
       world.flows[i].mat.uniforms.uTime.value = simTime;

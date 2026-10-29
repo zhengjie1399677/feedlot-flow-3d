@@ -165,6 +165,14 @@
     M.hay = S({ color: 0x9b8d6a, roughness: 1 });
     // 交易栏圈地面：浅灰垫层，跟黄褐色的牛拉开（原来是黄的，牛也黄，糊成一片）
     M.penPad = S({ map: T.concrete, color: 0xb3b3ad, roughness: 0.95 });
+    M.grunge = new THREE.MeshStandardMaterial({
+      map: T.grunge, transparent: true, opacity: 0.9, roughness: 1, metalness: 0,
+      depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+    });
+    M.track = new THREE.MeshStandardMaterial({
+      color: 0x2a251f, transparent: true, opacity: 0.20, roughness: 1, metalness: 0,
+      depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+    });
     M.barnPad = S({ map: T.concrete, color: 0xb0aea6, roughness: 0.96 });
     M.barnStraw = S({ color: 0x8d8574, roughness: 1 });
     M.bark = S({ color: 0x3a2c21, roughness: 0.95 });
@@ -229,6 +237,49 @@
     const wb = L.slots.weighbridge;
     for (let i = 0; i < 7; i++) {
       U.box(kit, M.yellow, 3.4, 0.02, 0.34, wb.x - 15, 0.242, wb.z - 6 + i * 2, 0, 0, 0);
+    }
+  }
+
+  // 场院的"使用痕迹"：脏迹斑块 + 轮胎印
+  function buildWear(kit, M, world) {
+    const rand = U.rng(8823);
+    const quad = function (w, d, x, z, rot, mat, y) {
+      const g = new THREE.PlaneGeometry(w, d);
+      g.rotateX(-Math.PI / 2);
+      kit.add(g, mat, U.mat4(x, y, z, 0, rot, 0));
+    };
+
+    // 脏迹：散在牛舍条带与场院里的大块暗斑
+    const spots = [
+      [-60, 8, 44, 30], [10, -6, 52, 34], [70, 10, 46, 32], [96, -30, 40, 30],
+      [-20, 34, 50, 36], [40, 30, 44, 28], [-96, 20, 34, 26], [110, 34, 38, 26],
+      [24, -50, 40, 26], [-44, -52, 36, 24], [86, -52, 38, 24], [52, 58, 46, 30],
+    ];
+    for (let i = 0; i < spots.length; i++) {
+      const sp = spots[i];
+      quad(sp[2], sp[3], sp[0], sp[1], rand() * Math.PI * 2, M.grunge, 0.2125);
+    }
+
+    // 轮胎印：沿每条车辆路线铺两条细带（只铺场地内的段）
+    const R = L.routes;
+    const names = Object.keys(R);
+    for (const nm of names) {
+      const pts = R[nm];
+      for (let k = 0; k < pts.length - 1; k++) {
+        const a = pts[k], b = pts[k + 1];
+        if (a.x < -124 || a.x > 122 || a.z < -92 || a.z > 88) continue;
+        if (b.x < -124 || b.x > 122 || b.z < -92 || b.z > 88) continue;
+        const dx = b.x - a.x, dz = b.z - a.z;
+        const len = Math.hypot(dx, dz);
+        if (len < 1.2 || len > 40) continue;
+        const ang = Math.atan2(dx, dz);
+        const nx = (dz / len), nz = (-dx / len);
+        for (const sgn of [-0.86, 0.86]) {
+          const cx = (a.x + b.x) / 2 + nx * sgn;
+          const cz = (a.z + b.z) / 2 + nz * sgn;
+          quad(0.46, len, cx, cz, ang, M.track, 0.2135);
+        }
+      }
     }
   }
 
@@ -630,6 +681,7 @@
     buildGround(kit, M);
     buildRoads(kit, M, world);
     buildFlows(kit, M, world);
+    buildWear(kit, M, world);
     buildFences(kit, M);
     FL.buildBuildings(kit, M, world);
     buildProps(kit, M, world);
