@@ -613,11 +613,11 @@
   }
 
   /* ---------------- 机修车库 · 停车场 ---------------- */
-  function buildWorkshop(kit, M, world) {
-    const cx = 34, cz = 13, w = 26, d = 14;
-    const zf = cz + d / 2;
+  function buildWorkshop(kit, M, world, cx, cz) {
+    const w = 22, d = 13;
+    const zf = cz + d / 2, zb = cz - d / 2;
 
-    U.box(kit, M.yard, w + 12, 0.1, d + 14, cx, 0.245, cz + 2, 0, 0, 0, 1.5);
+    U.box(kit, M.yard, w + 14, 0.1, d + 20, cx, 0.245, cz + 1, 0, 0, 0, 1.5);
     // 主体
     U.box(kit, M.wallCool, w, 4.6, d, cx, 2.52, cz, 0, 0, 0, 0.05);
     // 墙裙
@@ -625,55 +625,54 @@
     // 檐口
     U.box(kit, M.steel, w + 0.4, 0.22, d + 0.4, cx, 4.92, cz);
     // 双坡金属屋面
-    const a = 0.245;
-    for (const s of [-1, 1]) {
-      U.box(kit, M.roofPlant, w + 1.2, 0.2, 7.9, cx, 5.55, cz + s * 3.6, s * a, 0, 0);
+    const a2 = 0.245;
+    for (const s2 of [-1, 1]) {
+      U.box(kit, M.roofPlant, w + 1.2, 0.2, d / 2 + 0.95, cx, 5.55, cz + s2 * 3.35, s2 * a2, 0, 0);
     }
     U.box(kit, M.steel, w + 1.4, 0.16, 0.7, cx, 6.42, cz);
-    U.box(kit, M.warmGlow, w + 1.0, 0.05, 0.07, cx, 4.7, cz + 7.35);
+    U.box(kit, M.warmGlow, w + 1.0, 0.05, 0.07, cx, 4.7, zf + 0.42);
 
-    // 三樘卷帘门
+    // 三樘卷帘门（朝南）
     for (let i = 0; i < 3; i++) {
-      const x = cx - 8 + i * 8;
+      const x = cx - 7 + i * 7;
       U.box(kit, M.steel, 5.0, 4.2, 0.16, x, 2.32, zf + 0.04);
       U.box(kit, M.wallDark, 4.5, 3.7, 0.1, x, 2.12, zf + 0.13);
       for (let r = 0; r < 4; r++) {
         U.box(kit, M.steel, 4.5, 0.05, 0.05, x, 0.52 + r * 0.88, zf + 0.2);
       }
       U.box(kit, M.warmGlow, 4.6, 0.09, 0.06, x, 4.22, zf + 0.14);
-      world.pools.push({ x: x, z: zf + 3.2, size: 12, warm: 1 });
-      // 门侧防撞柱
+      world.pools.push({ x: x, z: zf + 3.4, size: 12, warm: 1 });
       U.cyl(kit, M.yellow, 0.11, 0.11, 1.05, 8, x - 2.7, 0.78, zf + 0.5);
       U.cyl(kit, M.yellow, 0.11, 0.11, 1.05, 8, x + 2.7, 0.78, zf + 0.5);
     }
 
-    // 东侧雨棚 + 工作台
-    U.box(kit, M.roofPlant, 6.4, 0.16, 14, 50.2, 3.9, cz, 0, 0, -0.03);
-    for (const pz of [cz - 6.4, cz + 6.4]) {
-      for (const px of [47.3, 52.9]) U.box(kit, M.steel, 0.16, 3.8, 0.16, px, 2.1, pz);
+    // 东侧雨棚 + 工作台 + 油桶
+    const xc = cx + w / 2 + 5.4;
+    U.box(kit, M.roofPlant, 6.4, 0.16, 12, xc, 3.9, cz, 0, 0, -0.03);
+    for (const pz of [cz - 5.4, cz + 5.4]) {
+      for (const px of [xc - 2.9, xc + 2.7]) U.box(kit, M.steel, 0.16, 3.8, 0.16, px, 2.1, pz);
     }
-    U.box(kit, M.warmGlow, 5.6, 0.06, 0.07, 50.2, 3.75, cz + 6.9);
-    U.box(kit, M.timberLight, 3.6, 0.16, 1.1, 51.4, 1.18, 8.4);
-    U.box(kit, M.steel, 3.4, 0.1, 0.9, 51.4, 1.02, 8.4);
-    for (const pz of [7.2, 9.6]) U.box(kit, M.steel, 0.1, 0.95, 0.1, 51.4, 0.72, pz);
+    U.box(kit, M.warmGlow, 5.6, 0.06, 0.07, xc, 3.75, cz + 5.9);
+    U.box(kit, M.timberLight, 3.6, 0.16, 1.1, xc + 1.2, 1.18, cz - 2.6);
+    U.box(kit, M.steel, 3.4, 0.1, 0.9, xc + 1.2, 1.02, cz - 2.6);
+    for (const pz of [cz - 3.8, cz - 1.6]) U.box(kit, M.steel, 0.1, 0.95, 0.1, xc + 1.2, 0.72, pz);
     for (let i = 0; i < 3; i++) {
-      U.cyl(kit, i === 1 ? M.blue : M.red, 0.44, 0.44, 1.1, 12, 52.1, 0.8, 17.1 + (i % 2) * 1.0);
+      U.cyl(kit, i === 1 ? M.blue : M.red, 0.44, 0.44, 1.1, 12, xc + 1.9, 0.8, cz + 6.4 + (i % 2) * 1.0);
     }
+    world.pools.push({ x: xc, z: cz + 3, size: 16, warm: 1 });
 
-    world.pools.push({ x: 50, z: cz + 4, size: 16, warm: 1 });
-
-    // 消防水罐
+    // 消防水罐（北侧）
     for (let i = 0; i < 2; i++) {
-      const tz = 5 + i * 9.2;
-      U.cyl(kit, M.galv, 2.0, 2.0, 6.2, 18, 56.2, 3.35, tz);
-      U.cyl(kit, M.galv, 0.35, 2.0, 1.1, 18, 56.2, 7.0, tz);
-      U.cyl(kit, M.steel, 2.05, 2.05, 0.14, 18, 56.2, 4.4, tz);
-      U.cyl(kit, M.steel, 2.05, 2.05, 0.14, 18, 56.2, 2.2, tz);
-      U.box(kit, M.steel, 0.06, 6.2, 0.5, 58.2, 3.3, tz);
-      U.box(kit, M.concreteTrough, 5.0, 0.5, 5.0, 56.2, 0.3, tz, 0, 0, 0, 0.2);
+      const tx = cx - 5 + i * 8.6;
+      const tz = zb - 4.4;
+      U.cyl(kit, M.galv, 2.0, 2.0, 6.2, 18, tx, 3.35, tz);
+      U.cyl(kit, M.galv, 0.35, 2.0, 1.1, 18, tx, 7.0, tz);
+      U.cyl(kit, M.steel, 2.05, 2.05, 0.14, 18, tx, 4.4, tz);
+      U.cyl(kit, M.steel, 2.05, 2.05, 0.14, 18, tx, 2.2, tz);
+      U.box(kit, M.concreteTrough, 5.0, 0.5, 5.0, tx, 0.3, tz, 0, 0, 0, 0.2);
     }
-    U.box(kit, M.wallCool, 2.6, 1.9, 2.2, 56.2, 1.15, 20.4);
-    U.cyl(kit, M.steel, 0.1, 0.1, 2.6, 8, 57.1, 3.0, 20.9);
+    U.box(kit, M.wallCool, 2.6, 1.9, 2.2, cx + w / 2 - 2.2, 1.15, zf + 1.6);
+    U.cyl(kit, M.steel, 0.1, 0.1, 2.6, 8, cx + w / 2 - 1.3, 3.0, zf + 2.1);
   }
 
   /* 停放中的挂车 */
@@ -704,45 +703,354 @@
     }
   }
 
-  /* ---------------- 干草棚 ---------------- */
-  function buildHayBarn(kit, M, world) {
-    const cx = -22, cz = 9, w = 22, d = 12;
-    const zf = cz + d / 2;
-    U.box(kit, M.yard, w + 10, 0.1, d + 10, cx, 0.235, cz, 0, 0, 0, 1.5);
-    // 三面墙
-    U.box(kit, M.wallDark, w, 4.4, 0.3, cx, 2.42, cz - d / 2);
-    U.box(kit, M.wallDark, 0.3, 4.4, d, cx - w / 2, 2.42, cz);
-    U.box(kit, M.wallDark, 0.3, 4.4, d, cx + w / 2, 2.42, cz);
-    // 前柱与前梁
-    for (let i = 0; i < 6; i++) {
-      U.box(kit, M.steel, 0.22, 4.2, 0.22, cx - w / 2 + (i * w) / 5, 2.32, zf);
+  /* ---------------- 生产区 / 交易区之间的围墙 ---------------- */
+  function buildCompoundWall(kit, M, world) {
+    const W = L.market.wall;
+    const H = 2.4;
+    const gates = (W.gates || []).slice();
+    const segs = [];
+    let cur = W.x0;
+    for (const g of gates) {
+      if (g[0] > cur) segs.push([cur, g[0]]);
+      cur = Math.max(cur, g[1]);
     }
-    U.box(kit, M.steel, w + 0.4, 0.24, 0.28, cx, 4.42, zf);
-    U.box(kit, M.steel, w + 0.4, 0.2, 0.28, cx, 4.96, cz - d / 2);
-    // 单坡屋面
-    U.box(kit, M.roofPlant, w + 1.8, 0.18, d + 2.4, cx, 4.86, cz, 0.075, 0, 0);
-    // 干草捆
-    for (let row = 0; row < 2; row++) {
-      for (let i = 0; i < 9; i++) {
-        const g = new THREE.CylinderGeometry(0.84, 0.84, 1.4, 14);
-        g.applyMatrix4(U.mat4(0, 0, 0, Math.PI / 2, 0, 0));
-        g.applyMatrix4(U.mat4(cx - w / 2 + 2.1 + i * 2.24, 1.06, cz - 2.6 + row * 4.2));
-        kit.add(g, row === 1 ? M.tarp : M.hay);
+    if (cur < W.x1) segs.push([cur, W.x1]);
+
+    for (const seg of segs) {
+      const x0 = seg[0], x1 = seg[1];
+      const len = x1 - x0;
+      const n = Math.max(1, Math.round(len / 4));
+      const step = len / n;
+      U.box(kit, M.concreteTrough, len, 0.24, 0.76, (x0 + x1) / 2, 0.32, W.z);
+      U.box(kit, M.steel, len, 0.15, 0.38, (x0 + x1) / 2, 0.44 + H + 0.07, W.z);
+      for (let i = 0; i < n; i++) {
+        const x = x0 + (i + 0.5) * step;
+        U.box(kit, M.wallCool, step - 0.14, H, 0.26, x, 0.44 + H / 2, W.z);
+        U.box(kit, M.steel, step - 0.22, 0.05, 0.3, x, 0.44 + H * 0.68, W.z);
+      }
+      for (let i = 0; i <= n; i++) {
+        const x = x0 + i * step;
+        U.box(kit, M.wallDark, 0.3, H + 0.34, 0.36, x, 0.44 + (H + 0.34) / 2, W.z);
+      }
+      // 南侧绿化带
+      U.box(kit, M.grass, len, 0.14, 1.0, (x0 + x1) / 2, 0.31, W.z + 0.94);
+      for (let i = 0; i * 6.5 + 3 < len; i++) {
+        const x = x0 + 3 + i * 6.5;
+        U.box(kit, i % 2 ? M.leafA : M.leafB, 1.2, 0.8, 1.0, x, 0.78, W.z + 0.94, 0, i * 0.7, 0, 0.3);
       }
     }
-    // 前场草捆
-    for (let i = 0; i < 3; i++) {
-      const g = new THREE.CylinderGeometry(0.9, 0.9, 1.5, 14);
-      g.applyMatrix4(U.mat4(0, 0, 0, 0, 0, Math.PI / 2));
-      g.applyMatrix4(U.mat4(cx + 6.5, 1.0, zf + 4.5 + i * 2.1));
-      kit.add(g, M.hay);
+
+    // 车行大门
+    for (const g of gates) {
+      const gx0 = g[0], gx1 = g[1], mid = (gx0 + gx1) / 2, gw = gx1 - gx0;
+      for (const x of [gx0, gx1]) {
+        U.box(kit, M.wallDark, 0.6, H + 1.0, 0.62, x, 0.44 + (H + 1.0) / 2, W.z);
+        U.box(kit, M.steel, 0.7, 0.14, 0.7, x, 0.44 + H + 1.06, W.z);
+      }
+      U.box(kit, M.steel, gw + 0.5, 0.2, 0.34, mid, 0.44 + H + 0.74, W.z);
+      const leaf = gw * 0.52;
+      for (let r = 0; r < 5; r++) {
+        U.box(kit, M.steel, leaf, 0.09, 0.1, gx0 + leaf / 2 + 0.3, 0.92 + r * 0.4, W.z + 0.27);
+      }
+      U.box(kit, M.steel, 0.12, 2.05, 0.13, gx0 + leaf + 0.3, 1.5, W.z + 0.27);
+      sign(world, '生产区', 'PRODUCTION AREA · 谢绝参观', 5.6, 1.25, mid, 3.74, W.z + 0.17, 0, {
+        size: 78, subSize: 28, bg: 'rgba(8,11,13,0.9)', border: 'rgba(255,180,110,0.34)',
+        glow: 'rgba(255,150,80,0.22)', color: '#f6e7cf',
+      });
+      world.pools.push({ x: mid, z: W.z + 2.4, size: 14, warm: 0.7 });
     }
-    sign(world, '干草棚', 'HAY BARN', 6.2, 1.2, cx + w / 2 + 0.16, 3.9, cz, Math.PI / 2, {
-      size: 84, subSize: 32, bg: 'rgba(10,13,15,0.88)', border: 'rgba(220,200,150,0.32)',
-      glow: 'rgba(220,190,130,0.3)', color: '#efe3c8',
+
+    // 人行小门
+    const wg = W.walkGate;
+    if (wg) {
+      const mid = (wg[0] + wg[1]) / 2;
+      for (const x of [wg[0], wg[1]]) U.box(kit, M.steel, 0.18, 2.3, 0.18, x, 1.4, W.z);
+      U.box(kit, M.steel, wg[1] - wg[0], 0.12, 0.2, mid, 2.6, W.z);
+      U.box(kit, M.wallDark, (wg[1] - wg[0]) * 0.46, 1.9, 0.08, wg[0] + (wg[1] - wg[0]) * 0.3, 1.2, W.z + 0.14);
+    }
+  }
+
+  /* ---------------- 活牛交易中心 ---------------- */
+  function buildTradingCenter(kit, M, world) {
+    const Hh = L.market.hall;
+    const P = L.market.pens;
+    const cx = Hh.cx, cz = Hh.cz, hw = Hh.w / 2, hd = Hh.d / 2;
+    const zf = cz + hd;
+
+    // 交易广场（浅色铺装 + 标线）
+    U.box(kit, M.apron, 84, 0.08, 46, -2, 0.256, 12, 0, 0, 0, 1.6);
+    U.box(kit, M.yellow, 66, 0.03, 0.22, -6, 0.3, 31);
+    U.box(kit, M.line, 0.22, 0.03, 22, 36, 0.3, 20);
+
+    // ── 交易大厅 ──
+    U.box(kit, M.concreteTrough, Hh.w + 3.4, 0.62, Hh.d + 3.4, cx, 0.56, cz, 0, 0, 0, 1.4);
+    U.box(kit, M.wall, Hh.w, 8.8, Hh.d, cx, 4.95, cz, 0, 0, 0, 0.04);
+    U.box(kit, M.wallCool, Hh.w + 0.08, 2.3, Hh.d + 0.08, cx, 7.55, cz);
+    U.box(kit, M.steel, Hh.w + 0.5, 0.24, Hh.d + 0.5, cx, 8.86, cz);
+    U.box(kit, M.concreteTrough, Hh.w + 5, 0.26, 1.4, cx, 0.35, zf + 1.2, 0, 0, 0, 0.9);
+
+    // 南立面玻璃幕墙
+    const bays = 7, bayW = Hh.w / bays;
+    for (let i = 0; i < bays; i++) {
+      const x = cx - hw + bayW * (i + 0.5);
+      U.box(kit, M.glass, bayW - 1.0, 5.6, 0.16, x, 3.6, zf + 0.02);
+      U.box(kit, M.steelLight, 0.42, 6.2, 0.3, cx - hw + bayW * i, 3.9, zf + 0.04);
+      U.box(kit, M.steel, bayW - 0.9, 0.12, 0.22, x, 0.95, zf + 0.06);
+    }
+    U.box(kit, M.steelLight, 0.42, 6.2, 0.3, cx + hw, 3.9, zf + 0.04);
+    U.box(kit, M.steel, Hh.w + 0.6, 0.26, 0.4, cx, 6.55, zf + 0.06);
+    glowPlane(world, Hh.w - 3, 4.6, cx, 3.4, zf - 0.6, 0, 0xffc98a, 0.14);
+
+    // 入口雨棚
+    const doorW = 7.4;
+    U.box(kit, M.roofPlant, doorW + 6, 0.22, 4.2, cx, 5.75, zf + 2.0, -0.03, 0, 0);
+    for (const px of [cx - doorW / 2 - 1.2, cx + doorW / 2 + 1.2]) {
+      U.box(kit, M.steelLight, 0.24, 5.6, 0.24, px, 2.85, zf + 3.7);
+    }
+    U.box(kit, M.warmGlow, doorW + 5, 0.07, 0.08, cx, 5.6, zf + 4.0);
+    U.box(kit, M.glass, doorW, 4.6, 0.14, cx, 2.6, zf + 0.1);
+    for (const px of [cx - doorW / 2, cx + doorW / 2, cx]) {
+      U.box(kit, M.steelLight, 0.22, 4.7, 0.22, px, 2.6, zf + 0.14);
+    }
+    world.pools.push({ x: cx, z: zf + 4.6, size: 26, warm: 1 });
+    glowSprite(world, 0xffcf9a, 6.5, cx, 4.6, zf + 2.2, 0.5);
+
+    // 招牌与行情屏
+    sign(world, '活牛交易中心', 'LIVE CATTLE MARKET · 每日竞价', 22, 3.0, cx, 8.35, zf + 0.16, 0, {
+      size: 96, subSize: 34, bg: 'rgba(9,12,14,0.92)', border: 'rgba(255,178,104,0.5)',
+      glow: 'rgba(255,160,80,0.35)', color: '#ffe6c4', subColor: 'rgba(255,196,150,0.8)',
     });
-    world.pools.push({ x: cx, z: zf + 3, size: 20, warm: 0.4 });
-    world.pools.push({ x: cx - 2, z: cz - 1, size: 13, warm: 1 });
+    sign(world, '今日活牛 32.6 元/公斤', '挂牌 128 头 · 成交 96 头', 17, 1.9, cx, 6.35, zf + 2.9, 0, {
+      size: 64, subSize: 38, bg: 'rgba(10,14,12,0.9)', border: 'rgba(140,235,170,0.42)',
+      glow: 'rgba(120,240,180,0.22)', color: '#c8f5d6', subColor: 'rgba(150,240,190,0.82)',
+    });
+    // 屋顶设备
+    for (const px of [cx - 8, cx + 3]) {
+      U.box(kit, M.galv, 3.4, 1.2, 2.6, px, 9.5, cz - 3);
+      U.cyl(kit, M.steel, 1.1, 1.1, 0.16, 12, px + 1.4, 10.2, cz - 3);
+    }
+    U.cyl(kit, M.steel, 0.12, 0.12, 5.0, 8, cx + 11.5, 11.2, cz - 4);
+    glowSprite(world, 0xff5a4a, 1.6, cx + 11.5, 13.8, cz - 4, 0.9);
+
+    // ── 待售栏 ──
+    const penX = P.x0, penZ = P.z0;
+    const penW = P.w, penD = P.d, gx = P.gx, gz = P.gz;
+    const totalW = P.cols * penW + (P.cols - 1) * gx;
+    const totalD = P.rows * penD + (P.rows - 1) * gz;
+    U.box(kit, M.hay, totalW + 6, 0.1, totalD + 6, penX + totalW / 2, 0.27, penZ + totalD / 2, 0, 0, 0, 1.2);
+    for (let r = 0; r < P.rows; r++) {
+      for (let c = 0; c < P.cols; c++) {
+        const x0 = penX + c * (penW + gx), z0 = penZ + r * (penD + gz);
+        const mx = x0 + penW / 2, mz = z0 + penD / 2;
+        const posts = 4;
+        for (let i = 0; i <= posts; i++) {
+          const t = i / posts;
+          const pts = [
+            [x0 + penW * t, z0], [x0 + penW * t, z0 + penD],
+            [x0, z0 + penD * t], [x0 + penW, z0 + penD * t],
+          ];
+          for (const p of pts) U.box(kit, M.steel, 0.13, 1.5, 0.13, p[0], 1.02, p[1]);
+        }
+        for (const y of [0.72, 1.28]) {
+          U.box(kit, M.steel, penW, 0.08, 0.08, mx, y, z0);
+          U.box(kit, M.steel, penW, 0.08, 0.08, mx, y, z0 + penD);
+          U.box(kit, M.steel, 0.08, 0.08, penD, x0, y, mz);
+          U.box(kit, M.steel, 0.08, 0.08, penD, x0 + penW, y, mz);
+        }
+        // 料槽（北侧）+ 水槽（东南角）
+        U.box(kit, M.concreteTrough, penW - 0.6, 0.62, 0.95, mx, 0.72, z0 + 0.62, 0, 0, 0, 0.22);
+        U.box(kit, M.feed, penW - 1.0, 0.18, 0.72, mx, 1.06, z0 + 0.62);
+        U.box(kit, M.steel, 1.7, 0.62, 0.7, x0 + penW - 1.4, 0.72, z0 + penD - 1.1, 0, 0, 0, 0.16);
+        U.box(kit, M.water, 1.5, 0.06, 0.52, x0 + penW - 1.4, 1.0, z0 + penD - 1.1);
+        if (r === 0 && c === 0) world.pools.push({ x: mx, z: mz, size: 14, warm: 0.32 });
+      }
+    }
+    // 栏间过道灯
+    for (let c = 0; c < P.cols - 1; c++) {
+      const x = penX + c * (penW + gx) + penW + gx / 2;
+      U.cyl(kit, M.steel, 0.09, 0.11, 4.6, 8, x, 2.5, penZ + totalD / 2);
+      glowSprite(world, 0xffd7a0, 2.2, x, 4.9, penZ + totalD / 2, 0.7);
+    }
+
+    // ── 装牛台 + 停着的活牛车 ──
+    const R = L.market.ramp;
+    U.box(kit, M.concreteTrough, 4.4, 1.1, 7.6, R.x, 0.86, R.z, 0, 0, 0, 0.3);
+    U.box(kit, M.concreteTrough, 3.2, 0.4, 7.6, R.x - 3.6, 0.5, R.z, 0, 0, -0.16, 0.2);
+    for (const pz of [R.z - 3.6, R.z + 3.6]) {
+      U.box(kit, M.steel, 4.4, 0.08, 0.08, R.x, 2.1, pz);
+      U.box(kit, M.steel, 0.08, 1.0, 0.08, R.x - 2.1, 1.9, pz);
+      U.box(kit, M.steel, 0.08, 1.0, 0.08, R.x + 2.1, 1.9, pz);
+    }
+    parkedStockTruck(kit, M, R.x + 10.5, R.z - 0.4, 0);
+    world.pools.push({ x: R.x + 4, z: R.z, size: 13, warm: 0.85 });
+
+    // ── 交易小地磅 ──
+    const SC = L.market.scale;
+    U.box(kit, M.concreteTrough, 10, 0.34, 4.4, SC.x, 0.4, SC.z, 0, 0, 0, 0.2);
+    U.box(kit, M.steel, 9.2, 0.06, 3.6, SC.x, 0.6, SC.z);
+    for (const sx of [-1, 1]) {
+      for (const sz of [-1, 1]) {
+        U.box(kit, M.steel, 0.16, 1.2, 0.16, SC.x + sx * 4.2, 0.98, SC.z + sz * 1.7);
+      }
+    }
+    U.box(kit, M.wallCool, 2.6, 2.6, 2.4, SC.x + 6.4, 1.6, SC.z + 2.6);
+    U.box(kit, M.glass, 2.0, 0.9, 0.1, SC.x + 6.4, 2.2, SC.z + 1.38);
+    sign(world, '交易地磅', 'LIVE SCALE', 3.4, 0.9, SC.x, 1.9, SC.z - 2.6, 0, {
+      size: 62, subSize: 24, bg: 'rgba(8,12,14,0.9)', border: 'rgba(120,200,255,0.35)',
+      glow: 'rgba(90,180,255,0.2)', color: '#d6ecff',
+    });
+
+    // ── 广场摊位 + 彩旗 ──
+    const awn = [M.red, M.yellow, M.blue, M.leafA];
+    for (let i = 0; i < 4; i++) {
+      const x = -34 + i * 7.2, z = 21;
+      U.box(kit, awn[i], 4.4, 0.16, 2.2, x, 2.72, z - 1.05, 0.08, 0, 0);
+      U.box(kit, awn[i], 4.4, 0.16, 2.2, x, 2.64, z + 1.05, -0.08, 0, 0);
+      for (const sx of [-1.9, 1.9]) {
+        for (const sz of [-1.9, 1.9]) U.box(kit, M.steel, 0.12, 2.6, 0.12, x + sx, 1.55, z + sz);
+      }
+      U.box(kit, M.timberLight, 3.8, 0.16, 1.0, x, 1.1, z + 1.2);
+      U.box(kit, M.steel, 3.6, 0.7, 0.12, x, 0.62, z + 1.2);
+      for (let k = 0; k < 3; k++) {
+        U.box(kit, k === 1 ? M.blue : M.red, 0.8, 0.5, 0.8, x - 1.2 + k * 1.2, 0.5, z - 1.0, 0, k * 0.4, 0, 0.12);
+      }
+      world.pools.push({ x: x, z: z + 1.6, size: 8, warm: 0.7 });
+    }
+    const flagCols = [M.red, M.blue, M.yellow, M.red, M.blue, M.yellow];
+    for (let i = 0; i < flagCols.length; i++) {
+      const x = -40 + i * 5.4;
+      U.cyl(kit, M.steelLight, 0.06, 0.09, 6.4, 6, x, 3.4, 11.8);
+      U.box(kit, flagCols[i], 1.5, 0.85, 0.05, x + 0.8, 6.0, 16.2, 0, 0.22, 0);
+      U.box(kit, flagCols[i], 0.9, 0.6, 0.05, x + 0.5, 5.5, 16.2, 0, 0.1, 0);
+    }
+    // 广场花箱
+    for (let i = 0; i < 4; i++) {
+      const x = -32 + i * 12;
+      U.box(kit, M.concreteTrough, 2.0, 0.6, 2.0, x, 0.5, 27, 0, 0, 0, 0.16);
+      U.box(kit, M.leafA, 1.7, 0.9, 1.7, x, 1.1, 27, 0, 0.3, 0, 0.3);
+    }
+    // 中央圆形花池
+    U.cyl(kit, M.concreteTrough, 4.4, 4.6, 0.7, 28, 6, 0.46, 24);
+    U.cyl(kit, M.apron, 4.0, 4.0, 0.2, 28, 6, 0.82, 24);
+    U.cyl(kit, M.leafA, 3.3, 3.5, 1.0, 24, 6, 1.1, 24);
+    U.cyl(kit, M.leafB, 2.0, 2.2, 1.1, 20, 6, 1.5, 24);
+    world.pools.push({ x: 6, z: 24, size: 12, warm: 0.5 });
+    // 广场路灯
+    for (const lp of [[-16, 30], [14, 30], [30, 14], [-30, 12]]) {
+      U.cyl(kit, M.steel, 0.09, 0.12, 5.2, 8, lp[0], 2.8, lp[1]);
+      U.box(kit, M.lamp, 0.9, 0.18, 0.6, lp[0], 5.4, lp[1]);
+      glowSprite(world, 0xffd7a0, 2.6, lp[0], 5.4, lp[1], 0.85);
+      world.pools.push({ x: lp[0], z: lp[1], size: 13, warm: 0.85 });
+    }
+  }
+
+  /* ---------------- 员工办公楼 ---------------- */
+  function buildStaffOffice(kit, M, world) {
+    const O = L.market.office;
+    const cx = O.cx, cz = O.cz, w = O.w, d = O.d;
+    const zf = cz + d / 2;
+    const H = 10.6;
+
+    U.box(kit, M.concreteTrough, w + 4, 0.6, d + 4, cx, 0.52, cz, 0, 0, 0, 1.4);
+    U.box(kit, M.wall, w, H, d, cx, 0.8 + H / 2, cz, 0, 0, 0, 0.04);
+    for (const y of [0.8 + 3.3, 0.8 + 6.6]) {
+      U.box(kit, M.wallCool, w + 0.12, 0.42, d + 0.12, cx, y, cz);
+    }
+    U.box(kit, M.steel, w + 0.5, 0.24, d + 0.5, cx, 0.8 + H + 0.1, cz);
+    U.box(kit, M.wallCool, w + 0.4, 1.0, 0.3, cx, 0.8 + H + 0.62, zf - 0.2);
+    U.box(kit, M.wallCool, w + 0.4, 1.0, 0.3, cx, 0.8 + H + 0.62, cz - d / 2 + 0.2);
+
+    // 三层窗（南立面）
+    const bays = 11, bw = w / bays;
+    for (let f = 0; f < 3; f++) {
+      const y = 2.2 + f * 3.3;
+      for (let i = 0; i < bays; i++) {
+        const x = cx - w / 2 + bw * (i + 0.5);
+        if (f === 0 && (i === 4 || i === 5 || i === 6)) continue;
+        U.box(kit, M.glass, bw - 1.05, 1.85, 0.14, x, y + 0.5, zf + 0.02);
+        U.box(kit, M.warmGlow, bw - 1.5, 1.5, 0.06, x, y + 0.5, zf + 0.1);
+        U.box(kit, M.steelLight, 0.14, 1.9, 0.2, x - (bw - 1.05) / 2, y + 0.5, zf + 0.06);
+        U.box(kit, M.steelLight, 0.14, 1.9, 0.2, x + (bw - 1.05) / 2, y + 0.5, zf + 0.06);
+      }
+    }
+    // 东西两侧条窗
+    for (let f = 0; f < 3; f++) {
+      const y = 2.2 + f * 3.3;
+      for (const sx of [-1, 1]) {
+        U.box(kit, M.glass, 0.14, 1.8, d - 2.6, cx + sx * (w / 2 + 0.02), y + 0.5, cz);
+        U.box(kit, M.warmGlow, 0.06, 1.4, d - 3.4, cx + sx * (w / 2 + 0.08), y + 0.5, cz);
+      }
+    }
+
+    // 入口
+    const doorX = cx;
+    U.box(kit, M.glass, 8.4, 4.4, 0.16, doorX, 2.6, zf + 0.04);
+    for (const px of [doorX - 4.2, doorX - 1.4, doorX + 1.4, doorX + 4.2]) {
+      U.box(kit, M.steelLight, 0.2, 4.5, 0.22, px, 2.6, zf + 0.1);
+    }
+    U.box(kit, M.concreteTrough, 12, 0.3, 4.2, doorX, 0.62, zf + 2.2, 0, 0, 0, 0.8);
+    U.box(kit, M.roofPlant, 13, 0.22, 4.6, doorX, 5.3, zf + 2.4, -0.02, 0, 0);
+    U.box(kit, M.warmGlow, 12, 0.08, 0.09, doorX, 5.1, zf + 4.5);
+    for (const px of [doorX - 5.6, doorX + 5.6]) {
+      U.box(kit, M.steelLight, 0.26, 4.4, 0.26, px, 2.4, zf + 4.3);
+    }
+    glowPlane(world, 8.0, 3.6, doorX, 2.6, zf + 0.2, 0, 0xffc98a, 0.16);
+    world.pools.push({ x: doorX, z: zf + 4.6, size: 22, warm: 1 });
+    glowSprite(world, 0xffd0a0, 5.4, doorX, 3.2, zf + 1.6, 0.45);
+
+    sign(world, '员工办公楼', 'STAFF OFFICE · 综合管理', 12, 1.7, doorX, 6.35, zf + 0.2, 0, {
+      size: 88, subSize: 34, bg: 'rgba(9,12,15,0.92)', border: 'rgba(150,205,255,0.42)',
+      glow: 'rgba(120,180,255,0.28)', color: '#e6f1ff', subColor: 'rgba(175,205,235,0.8)',
+    });
+
+    // 屋顶设备 + 旗杆
+    for (const px of [cx - 12, cx + 6]) {
+      U.box(kit, M.galv, 3.0, 1.1, 2.4, px, 0.8 + H + 1.0, cz + 1);
+    }
+    U.cyl(kit, M.steelLight, 0.07, 0.09, 7.5, 6, cx - 20, 4.3, zf + 3.4);
+    U.box(kit, M.red, 1.7, 1.0, 0.05, cx - 20 + 0.9, 7.5, zf + 3.4, 0, 0.2, 0);
+    // 楼前绿篱 / 花箱
+    for (let i = 0; i < 2; i++) {
+      const x = cx - 18 + i * 36;
+      U.box(kit, M.leafB, 9, 1.0, 1.3, x, 0.85, zf + 1.2, 0, 0, 0, 0.3);
+    }
+    for (let i = 0; i < 3; i++) {
+      const x = cx - 9 + i * 9;
+      U.box(kit, M.concreteTrough, 1.8, 0.55, 1.8, x, 0.48, zf + 2.6, 0, 0, 0, 0.14);
+      U.box(kit, M.leafA, 1.5, 0.8, 1.5, x, 1.0, zf + 2.6, 0, 0.4, 0, 0.3);
+    }
+  }
+
+  /* 静态停放的一台活牛车（交易区用） */
+  function parkedStockTruck(kit, M, x, z, rot) {
+    const base = U.mat4(x, 0.24, z, 0, rot, 0);
+    const put = function (mat, w, h, d, px, py, pz, r) {
+      const g = U.roundedBox(w, h, d, r === undefined ? 0.06 : r);
+      g.applyMatrix4(U.mat4(px, py, pz));
+      g.applyMatrix4(base);
+      kit.add(g, mat);
+    };
+    put(M.plinth, 13.2, 0.34, 2.3, 0, 0.62, 0, 0.08);
+    put(M.blue, 2.6, 2.5, 2.35, 5.6, 1.6, 0, 0.16);
+    put(M.plinth, 1.2, 0.6, 2.2, 4.2, 1.0, 0, 0.1);
+    put(M.glass, 2.2, 0.9, 2.28, 5.9, 2.35, 0, 0.12);
+    put(M.timber, 8.2, 0.22, 2.3, -1.2, 1.16, 0, 0.06);
+    for (const sz of [-1, 1]) {
+      for (let i = 0; i < 9; i++) {
+        put(M.steel, 0.12, 1.9, 0.12, -5.1 + i * 1.0, 2.2, sz * 1.1, 0.03);
+      }
+      for (const y of [1.6, 2.4, 3.1]) put(M.steel, 8.2, 0.1, 0.1, -1.2, y, sz * 1.1, 0.04);
+    }
+    put(M.steel, 0.12, 1.9, 2.3, -5.2, 2.2, 0, 0.03);
+    for (const wx of [5.6, -4.4, -3.0]) {
+      for (const wz of [-1.16, 1.16]) {
+        const g = new THREE.CylinderGeometry(0.66, 0.66, 0.42, 16);
+        g.applyMatrix4(U.mat4(0, 0, 0, Math.PI / 2, 0, 0));
+        g.applyMatrix4(U.mat4(wx, 0.9, wz));
+        g.applyMatrix4(base);
+        kit.add(g, M.plinth);
+      }
+    }
   }
 
   /* ---------------- 入口 ---------------- */
@@ -760,12 +1068,15 @@
     buildDock(kit, M, world);
     buildLoader(kit, M, world, -114, 12, -Math.PI / 2);
 
-    // 场区中部：机修车库 + 停车场 + 干草棚
-    buildWorkshop(kit, M, world);
-    buildHayBarn(kit, M, world);
-    parkedTrailer(kit, M, 8, 36, 0);
-    parkedTrailer(kit, M, 25, 36, 0.02);
-    parkedTrailer(kit, M, 42, 36, -0.015);
+    // 生产区与交易区的分界：围墙 + 活牛交易中心 + 员工办公楼
+    buildCompoundWall(kit, M, world);
+    buildTradingCenter(kit, M, world);
+    buildStaffOffice(kit, M, world);
+
+    // 机修车库挪到东南角，挂车停在员工车场
+    buildWorkshop(kit, M, world, L.market.workshop.cx, L.market.workshop.cz);
+    parkedTrailer(kit, M, 87, 9, 0);
+    parkedTrailer(kit, M, 99, 9, 0.015);
 
     // 料槽前的日粮光斑（喂料区）
     for (const b of L.barns) {

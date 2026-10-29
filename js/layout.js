@@ -73,6 +73,18 @@
       { cx: 76, cz: -28, len: 40, dep: 20, idx: 6, mirror: true },
     ],
 
+    /* 场区中部（生产区以南，用围墙隔开）：交易中心 / 员工办公 / 机修 */
+    market: {
+      wall: { z: -11, x0: -50, x1: 104, gates: [[-48, -38]], walkGate: [58, 61.5] },
+      hall: { cx: -22, cz: 2, w: 30, d: 15 },
+      pens: { x0: -2, z0: -9, cols: 3, rows: 2, w: 8.4, d: 7.4, gx: 1.8, gz: 1.8 },
+      ramp: { x: 23, z: 1 },
+      scale: { x: 50, z: 4 },
+      lot: { x0: 82, x1: 104, z0: 3.5, z1: 14.5 },
+      office: { cx: 52, cz: 33, w: 44, d: 12 },
+      workshop: { cx: 92, cz: 26 },
+    },
+
     colors: {
       intake: 0x63c9ff,
       forage: 0x9de07a,
@@ -249,7 +261,7 @@
     ],
 
     cameras: [
-      { id: 'overview', label: '全览', target: [-2, 1, -16], theta: 0.66, phi: 0.72, zoom: 0.88 },
+      { id: 'overview', label: '全览', target: [-2, 1, -9], theta: 0.66, phi: 0.72, zoom: 0.86 },
       { id: 'gate', label: '大门', target: [-104, 7, 56], theta: -1.15, phi: 0.95, zoom: 2.8 },
       { id: 'weigh', label: '地磅', target: [-84, 5, 56], theta: 0.30, phi: 0.92, zoom: 3.0 },
       { id: 'tmr', label: '配料', target: [-96, 9, -14], theta: 0.62, phi: 0.92, zoom: 2.3 },

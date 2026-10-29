@@ -212,15 +212,17 @@
     for (let i = 0; i < 7; i++) {
       U.box(kit, M.yellow, 3.4, 0.02, 0.34, wb.x - 15, 0.242, wb.z - 6 + i * 2, 0, 0, 0);
     }
-    // 停车位（场区中部，挂车停放带）
-    for (const pz of [33.0, 39.2]) {
-      U.box(kit, M.line, 48, 0.02, 0.14, 25, 0.242, pz);
+    // 停车位（机修车间东侧，挂车停放带）
+    const lot = L.market.lot;
+    for (const pz of [lot.z0, lot.z1]) {
+      U.box(kit, M.line, lot.x1 - lot.x0, 0.02, 0.14, (lot.x0 + lot.x1) / 2, 0.242, pz);
     }
-    for (const px of [0.6, 48.4]) {
-      U.box(kit, M.line, 0.14, 0.02, 6.4, px, 0.242, 36.1);
+    for (const px of [lot.x0, lot.x1]) {
+      U.box(kit, M.line, 0.14, 0.02, lot.z1 - lot.z0, px, 0.242, (lot.z0 + lot.z1) / 2);
     }
-    for (let i = 0; i < 3; i++) {
-      U.box(kit, M.line, 0.12, 0.02, 5.6, 7 + i * 17, 0.242, 36.1);
+    for (let i = 1; i < 3; i++) {
+      const px = lot.x0 + ((lot.x1 - lot.x0) * i) / 3;
+      U.box(kit, M.line, 0.12, 0.02, lot.z1 - lot.z0, px, 0.242, (lot.z0 + lot.z1) / 2);
     }
 
     // 流向光带
@@ -366,7 +368,9 @@
       [4, -88, 9.0, 0, false],
       [-116, 20, 8.8, 0, false],
       [-4, 30, 8.8, Math.PI / 2, false],
-      [68, 30, 8.8, Math.PI, false],
+      [78, 30, 8.8, Math.PI, false],
+      [-40, 22, 8.4, Math.PI / 2, false],
+      [99, 16, 8.4, -Math.PI / 2, false],
     ];
     for (const p of poles) lampPole(kit, M, world, p[0], p[1], p[2], p[3], p[4]);
 
