@@ -60,6 +60,7 @@ css/style.css       深色工业风界面（标题 / 图例 / 视角 / 流程条
 js/utils.js         程序化贴图、倒角盒、几何合并 Kit、文字贴图、曲线 Path、补间
 js/layout.js        唯一的数据源：地块、路网、车辆路线、流向带、六个阶段、镜头预设
 js/world.js         地面 / 道路 / 围栏 / 灯杆 / 树 / 标签 / 灯光 / 地面光池
+js/cows.js          牛群（InstancedMesh，数据来自 js/cow-asset.js）
 js/buildings.js     牛舍、地磅、大门、办公室、TMR 车间与筒仓、卸牛台、装车台、交易中心、员工楼、停车场、围墙
 js/vehicles.js      车辆造型 + 运动物理（加减速 / 跟车让行 / 刹车灯 / 转向灯）
 js/effects.js       环境贴图、天空穹顶与星空、相机轨道、泛光管线
@@ -91,3 +92,8 @@ bash tools/shot.sh 52 1920 1080 tools/shot.png
 ## 许可
 
 MIT。拿去随便用，商用、改、闭源分发都行，只要保留 LICENSE 里的版权声明即可（three.js 本体是 MIT，`vendor/three.min.js` 的版权归 three.js 作者）。
+
+## 素材与致谢
+
+- 牛模型：Quaternius 的 CC0 低模 Cow，用 `tools/_cowpack.py` 烘焙成 `js/cow-asset.js`（去掉了骨骼与动画，只留顶点/法线/索引，按材质合并后整群牛 7 个 draw call）。
+- 其余建筑、车辆、贴图全部程序化生成，不依赖外部资源。

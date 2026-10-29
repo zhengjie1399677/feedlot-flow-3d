@@ -80,6 +80,7 @@
     world = FL.buildWorld(scene);
     sky = FL.createSky(scene, world);
     fleet = FL.buildFleet(scene);
+    if (FL.buildHerd) FL.buildHerd(scene, FL.herdSpots(FL.LAYOUT || window.LAYOUT || {}));
     rig = FL.createCameraRig(camera, canvas);
     const camId = q.get('cam');
     const known = rig.presets && rig.presets.some(function (p) { return p.id === camId; });

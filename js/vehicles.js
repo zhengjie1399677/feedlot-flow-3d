@@ -166,15 +166,20 @@
     box(bedKit, m.paint, 2.4, 1.35, 0.13, 0, by(2.0), bz(TZ + LEN / 2 - 0.06));
     box(bedKit, m.dark, 2.4, 1.35, 0.13, 0, by(2.0), bz(TZ - LEN / 2 + 0.06));
     box(bedKit, m.accent, 2.52, 0.12, LEN + 0.02, 0, by(1.28), bz(TZ));
-    // 草捆
+    // 草捆（独立组：卸完货直接隐藏 = 空车）
     const hay = U.std({ color: 0xb89a55, roughness: 0.95, metalness: 0 });
+    const cargoKit = new U.Kit();
     for (let i = 0; i < 5; i++) {
-      rbox(bedKit, hay, 2.02, 0.62, 1.5, 0.2, 0, by(2.28), bz(TZ - 3.2 + i * 1.6));
+      rbox(cargoKit, hay, 2.02, 0.62, 1.5, 0.2, 0, by(2.28), bz(TZ - 3.2 + i * 1.6));
     }
     for (let i = 0; i < 4; i++) {
-      rbox(bedKit, hay, 2.0, 0.58, 1.45, 0.2, 0.05, by(2.9), bz(TZ - 2.4 + i * 1.6));
+      rbox(cargoKit, hay, 2.0, 0.58, 1.45, 0.2, 0.05, by(2.9), bz(TZ - 2.4 + i * 1.6));
     }
+    const cargo = new THREE.Group();
+    cargoKit.build(cargo);
+    cargo.traverse(function (o) { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     const bed = new THREE.Group();
+    bed.add(cargo);
     bed.position.set(0, PY, PZ);
     bedKit.build(bed);
     bed.traverse(function (o) { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
@@ -187,7 +192,7 @@
     wheels.push(wheel(m, 1.18, 5.25, 0.56, 0.44), wheel(m, -1.18, 5.25, 0.56, 0.44));
     wheels.push(wheel(m, 1.18, -3.4, 0.56, 0.5), wheel(m, -1.18, -3.4, 0.56, 0.5));
     wheels.push(wheel(m, 1.18, -4.9, 0.56, 0.5), wheel(m, -1.18, -4.9, 0.56, 0.5));
-    return { kit: kit, m: m, len: 13.8, lightZ: 6.2, tailZ: -6.3, labelY: 5.8, wheels: wheels, bed: bed };
+    return { kit: kit, m: m, len: 13.8, lightZ: 6.2, tailZ: -6.3, labelY: 5.8, wheels: wheels, bed: bed, cargo: cargo };
   }
 
   /* TMR 日粮车（拖拉机 + 卧式搅拌罐） */
@@ -435,6 +440,7 @@
         gate: built.gate || null,
         roll: 0,
         pitch: 0,
+        cargo: built.cargo || null,
         drumSpin: 0,
       };
       fleet.list.push(veh);
@@ -652,6 +658,13 @@
           const lbl = v.dwell && v.stops[v.si] ? String(v.stops[v.si].label || '') : '';
           const want = /青贮/.test(lbl) ? -0.40 : 0;
           v.bed.rotation.x += (want - v.bed.rotation.x) * (1 - Math.exp(-sdt * 1.8));
+        }
+        // 草料：卸到一半就没货了（空车）
+        if (v.cargo) {
+          const st2 = v.dwell && v.stops[v.si] ? v.stops[v.si] : null;
+          const unload = !!st2 && /青贮/.test(String(st2.label || ''));
+          const spent = unload && (st2.stop - v.dwellLeft) > st2.stop * 0.35;
+          v.cargo.visible = !spent;
         }
         // TMR 尾部出料门：投料时抬起
         if (v.gate) {

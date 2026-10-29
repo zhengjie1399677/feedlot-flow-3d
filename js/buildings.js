@@ -538,6 +538,64 @@
     sign(world, 'TMR 配料中心', 'TOTAL MIXED RATION', 9.6, 1.8, dx + 0.3, 7.6, -6, Math.PI / 2,
       { size: 88, subSize: 34, bg: 'rgba(6,10,12,0.94)', border: 'rgba(255,186,110,0.42)', glow: 'rgba(255,170,80,0.55)', color: '#ffe2b8' });
 
+    // ── 高跨中厅（把平屋顶拔起来一块，剪影不再是一只盒子）──
+    const cw = 11, cd = 12.5, chh = 4.4;
+    U.box(kit, M.wallCool, cw, chh, cd, cx - 1.5, h + 0.75 + chh / 2, cz - 1.5, 0, 0, 0, 0.05);
+    U.box(kit, M.steel, cw + 0.24, 0.4, cd + 0.24, cx - 1.5, h + 0.75 + chh * 0.52, cz - 1.5);
+    U.box(kit, M.roofPlant, cw + 1.4, 0.3, cd + 1.4, cx - 1.5, h + 0.75 + chh + 0.2, cz - 1.5);
+    U.box(kit, M.apronEdge, cw + 1.5, 0.44, 0.3, cx - 1.5, h + 0.75 + chh + 0.5, cz - 1.5 + cd / 2 + 0.6);
+    for (const sx of [-1, 1]) {
+      U.box(kit, M.glass, 0.14, 1.5, cd - 2.4, cx - 1.5 + sx * (cw / 2 + 0.03), h + 0.75 + chh * 0.62, cz - 1.5);
+    }
+    U.box(kit, M.glass, cw - 2.2, 1.5, 0.14, cx - 1.5, h + 0.75 + chh * 0.62, cz - 1.5 + cd / 2 + 0.04);
+    // 中厅顶的检修走道与栏杆
+    U.box(kit, M.steel, cw + 1.2, 0.1, 1.1, cx - 1.5, h + 0.75 + chh + 0.4, cz - 1.5 - cd / 2 - 1.0);
+    for (let i = 0; i < 7; i++) {
+      U.box(kit, M.steelLight, 0.08, 0.9, 0.08, cx - 1.5 - cw / 2 + i * 2.0, h + 0.75 + chh + 0.85, cz - 1.5 - cd / 2 - 1.5);
+    }
+
+    // ── 成品日粮仓（两只立式料仓，贴着车间北墙）──
+    for (const bx2 of [cx - 8.5, cx - 3.2]) {
+      const bh = 13.5, br = 2.6, bz2 = cz - d / 2 - 3.2;
+      U.cyl(kit, M.galv, br, br, bh, 18, bx2, bh / 2 + 1.2, bz2);
+      const cone = new THREE.ConeGeometry(br, 2.6, 18);
+      kit.add(cone, M.galv, U.mat4(bx2, 1.0, bz2, Math.PI, 0, 0));
+      U.cyl(kit, M.steelLight, br * 0.55, br * 0.55, 0.5, 14, bx2, bh + 1.5, bz2);
+      for (let r = 0; r < 3; r++) {
+        U.cyl(kit, M.steel, br + 0.06, br + 0.06, 0.16, 18, bx2, 4.2 + r * 3.6, bz2);
+      }
+      U.box(kit, M.steel, 0.9, 9.0, 0.9, bx2 + br - 0.5, 7.0, bz2 + br - 0.4);
+      for (const lx of [-1, 1]) {
+        U.box(kit, M.steelLight, 0.16, 3.0, 0.16, bx2 + lx * br * 0.7, 0.6, bz2);
+      }
+    }
+    // 日粮仓到车间的螺旋输送机（斜管）
+    const aug = new THREE.CylinderGeometry(0.42, 0.42, 9.2, 10);
+    kit.add(aug, M.galv, U.mat4(cx - 5.8, 9.4, cz - d / 2 - 3.2, 0, 0, Math.PI / 2 + 0.28));
+    // 出料口下的装车平台
+    U.box(kit, M.apronEdge, 9.0, 0.4, 4.0, cx - 5.8, 0.3, cz - d / 2 - 7.4, 0, 0, 0, 0.14);
+    for (const px of [cx - 9.2, cx - 2.4]) {
+      U.box(kit, M.yellow, 0.28, 1.2, 0.28, px, 0.95, cz - d / 2 - 8.9);
+    }
+
+    // ── 西侧苜蓿/干草棚（单坡，和主车间连成一片）──
+    U.box(kit, M.wallDark, 7.0, 4.6, 14, cx - w / 2 - 3.6, 2.7, cz + 1.5, 0, 0, 0, 0.04);
+    U.box(kit, M.roofPlant, 8.2, 0.24, 15.4, cx - w / 2 - 3.6, 5.2, cz + 1.5, 0, 0, 0.12);
+    for (let i = 0; i < 3; i++) {
+      U.box(kit, M.hay, 5.6, 1.3, 1.5, cx - w / 2 - 3.6, 1.2 + i * 0.0, cz - 4.2 + i * 3.0);
+    }
+
+    // ── 车间南墙的物流门 + 卸料月台 ──
+    U.box(kit, M.steel, 0.3, 4.6, 7.2, cx, 2.8, cz + d / 2 + 0.02);
+    U.box(kit, M.glass, 0.16, 4.0, 6.4, cx, 2.8, cz + d / 2 + 0.16);
+    for (let i = 0; i < 5; i++) {
+      U.box(kit, i % 2 ? M.yellow : M.steel, 0.22, 0.3, 7.2, cx + 2.6, 0.85 + i * 0.3, cz + d / 2 + 0.2);
+    }
+    U.box(kit, M.apronEdge, 12, 1.1, 5.0, cx + 1.2, 0.45, cz + d / 2 + 2.6, 0, 0, 0, 0.1);
+    for (const px of [cx - 4.2, cx + 1.2, cx + 6.4]) {
+      U.box(kit, M.soil, 0.5, 0.6, 0.5, px, 0.55, cz + d / 2 + 4.6, 0, 0, 0, 0.12);
+    }
+
     // 投料斗
     U.box(kit, M.steel, 3.4, 2.2, 3.4, dx + 3.2, 2.0, -6);
     U.box(kit, M.steel, 2.6, 0.16, 2.6, dx + 3.2, 3.2, -6);
@@ -960,22 +1018,7 @@
       glow: 'rgba(90,180,255,0.2)', color: '#d6ecff',
     });
 
-    // ── 广场摊位 + 彩旗 ──
-    const awn = [M.red, M.yellow, M.blue, M.leafA];
-    for (let i = 0; i < 4; i++) {
-      const x = -34 + i * 7.2, z = 21;
-      U.box(kit, awn[i], 4.4, 0.16, 2.2, x, 2.72, z - 1.05, 0.08, 0, 0);
-      U.box(kit, awn[i], 4.4, 0.16, 2.2, x, 2.64, z + 1.05, -0.08, 0, 0);
-      for (const sx of [-1.9, 1.9]) {
-        for (const sz of [-1.9, 1.9]) U.box(kit, M.steel, 0.12, 2.6, 0.12, x + sx, 1.55, z + sz);
-      }
-      U.box(kit, M.timberLight, 3.8, 0.16, 1.0, x, 1.1, z + 1.2);
-      U.box(kit, M.steel, 3.6, 0.7, 0.12, x, 0.62, z + 1.2);
-      for (let k = 0; k < 3; k++) {
-        U.box(kit, k === 1 ? M.blue : M.red, 0.8, 0.5, 0.8, x - 1.2 + k * 1.2, 0.5, z - 1.0, 0, k * 0.4, 0, 0.12);
-      }
-      world.pools.push({ x: x, z: z + 1.6, size: 8, warm: 0.7 });
-    }
+    // ── 广场彩旗 ──
     const flagCols = [M.red, M.blue, M.yellow, M.red, M.blue, M.yellow];
     for (let i = 0; i < flagCols.length; i++) {
       const x = 2 + i * 5.4;
@@ -1116,6 +1159,31 @@
     }
     U.cyl(kit, M.steelLight, 0.07, 0.09, 7.5, 6, cx - 20, 4.3, zf + 3.4);
     U.box(kit, M.red, 1.7, 1.0, 0.05, cx - 20 + 0.9, 7.5, zf + 3.4, 0, 0.2, 0);
+    // ── 楼前广场：旗阵 + 绿篱 + 落客车道 + 访客车位 ──
+    const fy = zf + 9.0;
+    U.box(rawKit, M.apron, 62, 0.2, 26, cx, 0.22, cz + d / 2 + 11, 0, 0, 0, 0.06);
+    U.box(rawKit, M.apronEdge, 62, 0.24, 0.6, cx, 0.26, cz + d / 2 + 24.2);
+    for (const fx of [cx - 9, cx, cx + 9]) {
+      U.cyl(rawKit, M.steelLight, 0.09, 0.12, 12.5, 8, fx, 6.5, fy);
+      U.box(rawKit, fx === cx ? M.red : (fx < cx ? M.blue : M.yellow), 1.9, 1.15, 0.06, fx + 1.0, 11.4, fy, 0, 0.24, 0);
+      U.cyl(rawKit, M.concreteTrough, 0.5, 0.6, 0.4, 10, fx, 0.45, fy);
+    }
+    for (const hx of [cx - 22, cx - 16, cx + 16, cx + 22]) {
+      U.box(rawKit, M.leafA, 5.4, 1.5, 1.4, hx, 1.0, cz + d / 2 + 6.5, 0, 0, 0, 0.4);
+    }
+    // 访客停车位（楼前偏东）
+    U.box(rawKit, M.apron, 22, 0.19, 9.5, cx + 20, 0.21, cz + d / 2 + 12, 0, 0, 0, 0.04);
+    for (let i = 0; i < 5; i++) {
+      U.box(rawKit, M.line, 0.12, 0.02, 4.6, cx + 11.4 + i * 4.3, 0.31, cz + d / 2 + 12.2);
+      if (i % 2 === 0) parkedCar(rawKit, M, cx + 13.6 + i * 4.3, cz + d / 2 + 12.2, Math.PI / 2, [M.wall, M.blue, M.red, M.galv][i % 4]);
+    }
+    // 门卫岗亭 + 道闸
+    U.box(rawKit, M.wallCool, 3.2, 2.6, 3.2, cx - 26.5, 1.9, cz + d / 2 + 22.6, 0, 0, 0, 0.06);
+    U.box(rawKit, M.roofPlant, 3.9, 0.22, 3.9, cx - 26.5, 3.34, cz + d / 2 + 22.6);
+    U.box(rawKit, M.glass, 2.4, 1.1, 0.08, cx - 26.5, 2.3, cz + d / 2 + 21.02);
+    U.box(rawKit, M.warmGlow, 2.2, 0.7, 0.06, cx - 26.5, 2.3, cz + d / 2 + 21.06);
+    world.pools.push({ x: cx - 26.5, z: cz + d / 2 + 21, size: 12, warm: 0.8 });
+
     // 楼前绿篱 / 花箱
     for (let i = 0; i < 2; i++) {
       const x = cx - 18 + i * 36;
