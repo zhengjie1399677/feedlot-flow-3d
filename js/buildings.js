@@ -113,8 +113,26 @@
     U.box(kit, M.timber, t + 0.1, 0.22, 2 * halfD, x, eave - 0.08, cz);
   }
 
+  /* 镜像排：几何绕自心转 180°（用旋转而不是负缩放，否则法线/绕序会反） */
+  function mirrorKit(kit, cx, cz) {
+    const pre = new THREE.Matrix4()
+      .makeTranslation(cx, 0, cz)
+      .multiply(new THREE.Matrix4().makeRotationY(Math.PI))
+      .multiply(new THREE.Matrix4().makeTranslation(-cx, 0, -cz));
+    return {
+      add: function (geo, mat, matrix) {
+        const m = (matrix ? matrix.clone() : new THREE.Matrix4()).premultiply(pre);
+        kit.add(geo, mat, m);
+      },
+    };
+  }
+
   function buildBarn(kit, M, world, b) {
     const cx = b.cx, cz = b.cz, len = b.len, dep = b.dep;
+    const mir = !!b.mirror;
+    // 非几何挂件（标签/光片/光斑）不在 kit 里，需要自己按镜像位摆放
+    const mx = (x) => (mir ? 2 * cx - x : x);
+    const mz = (z) => (mir ? 2 * cz - z : z);
     const halfL = len / 2, halfD = dep / 2;
     const zf = cz + halfD, zb = cz - halfD;
     const eave = 6.5, ridge = 10.1;
@@ -127,9 +145,21 @@
 
     // 背墙
     U.box(kit, M.wall, len, eave - y0, 0.3, cx, (eave + y0) / 2, zb + 0.15);
+    // 背墙立面：勒脚、高位通风格栅、雨水管（南排这面正对园区）
+    U.box(kit, M.apronEdge, len + 0.3, 0.9, 0.36, cx, 0.86, zb - 0.06);
+    U.box(kit, M.timber, len + 0.2, 0.14, 0.3, cx, 1.36, zb - 0.06);
+    for (let i = 0; i < 7; i++) {
+      const vx = cx - halfL + 3.4 + i * ((len - 6.8) / 6);
+      U.box(kit, M.steel, 2.0, 0.98, 0.12, vx, eave - 1.25, zb - 0.02);
+      U.box(kit, M.warmGlow, 1.66, 0.56, 0.07, vx, eave - 1.25, zb - 0.1);
+    }
+    for (const px of [cx - halfL + 0.95, cx + halfL - 0.95]) {
+      U.cyl(kit, M.steel, 0.1, 0.1, eave - 0.9, 8, px, (eave - 0.9) / 2 + 0.45, zb - 0.2);
+      U.box(kit, M.steel, 0.5, 0.16, 0.16, px, eave - 0.9, zb - 0.2);
+    }
     // 端墙
-    const d1 = b.idx === 1 ? { z0: doorZ - doorW / 2, z1: doorZ + doorW / 2, h: doorH } : null;
-    const d3 = b.idx === 3 ? { z0: doorZ - doorW / 2, z1: doorZ + doorW / 2, h: doorH } : null;
+    const d1 = (b.idx === 1 || b.idx === 4) ? { z0: doorZ - doorW / 2, z1: doorZ + doorW / 2, h: doorH } : null;
+    const d3 = (b.idx === 3 || b.idx === 6) ? { z0: doorZ - doorW / 2, z1: doorZ + doorW / 2, h: doorH } : null;
     gableWall(kit, M, cx - halfL + 0.15, cz, halfD, eave, ridge, y0, d1);
     gableWall(kit, M, cx + halfL - 0.15, cz, halfD, eave, ridge, y0, d3);
 
@@ -195,24 +225,24 @@
       kit.add(shade, M.steel, U.mat4(lx, 5.55, cz, 0, 0, 0));
       const bulb = new THREE.SphereGeometry(0.16, 8, 6);
       kit.add(bulb, M.lamp, U.mat4(lx, 5.42, cz, 0, 0, 0));
-      glowSprite(world, 0xffc180, 3.4, lx, 5.35, cz, 0.4);
+      glowSprite(world, 0xffc180, 3.4, mx(lx), 5.35, cz, 0.4);
     }
     // 室内地面光斑
-    world.pools.push({ x: cx, z: cz, size: 34, warm: 1 });
+    world.pools.push({ x: cx, z: mz(cz), size: 34, warm: 1 });
 
     // 门洞暖光
     if (b.idx === 1) {
-      glowPlane(world, 5.6, 4.4, cx - halfL + 0.02, y0 + 2.2, doorZ, Math.PI / 2, new THREE.Color(1.5, 0.85, 0.4), 0.16);
-      glowSprite(world, 0xffb070, 13, cx - halfL - 1, 2.4, doorZ, 0.32);
+      glowPlane(world, 5.6, 4.4, mx(cx - halfL + 0.02), y0 + 2.2, mz(doorZ), Math.PI / 2, new THREE.Color(1.5, 0.85, 0.4), 0.16);
+      glowSprite(world, 0xffb070, 13, mx(cx - halfL - 1), 2.4, mz(doorZ), 0.32);
     }
     if (b.idx === 3) {
-      glowPlane(world, 5.6, 4.4, cx + halfL - 0.02, y0 + 2.2, doorZ, -Math.PI / 2, new THREE.Color(1.5, 0.85, 0.4), 0.16);
-      glowSprite(world, 0xffb070, 13, cx + halfL + 1, 2.4, doorZ, 0.32);
+      glowPlane(world, 5.6, 4.4, mx(cx + halfL - 0.02), y0 + 2.2, mz(doorZ), -Math.PI / 2, new THREE.Color(1.5, 0.85, 0.4), 0.16);
+      glowSprite(world, 0xffb070, 13, mx(cx + halfL + 1), 2.4, mz(doorZ), 0.32);
     }
 
     // 牛舍标识
     sign(world, '0' + b.idx + ' 育肥牛舍', 'FATTENING BARN 0' + b.idx, 9, 1.5,
-      cx, eave + 1.4, zf + 0.35, 0, { size: 92, subSize: 36, bg: 'rgba(14,12,9,0.86)', border: 'rgba(220,180,120,0.35)' });
+      cx, eave + 1.4, mz(zf + 0.35), 0, { size: 92, subSize: 36, bg: 'rgba(14,12,9,0.86)', border: 'rgba(220,180,120,0.35)' });
   }
 
   /* ---------------- 卸牛台 ---------------- */
@@ -721,7 +751,7 @@
     M.lamp.userData.noShadow = true;
     M.redBeam.userData.noShadow = true;
 
-    for (const b of L.barns) buildBarn(kit, M, world, b);
+    for (const b of L.barns) buildBarn(b.mirror ? mirrorKit(kit, b.cx, b.cz) : kit, M, world, b);
     buildRamp(kit, M, world);
     buildWeigh(kit, M, world);
     buildGate(kit, M, world);

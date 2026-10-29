@@ -12,6 +12,15 @@
   const fixed = q.has('t') ? Math.max(0, parseFloat(q.get('t')) || 0) : null;
   const fxOn = q.get('fx') !== '0';
   const uiOn = q.get('ui') !== '0';
+  // 昼夜：一个循环 DAY_SECONDS 秒，从 05:00 走到 23:00（夜色的两端都是深夜，循环处看不出来）
+  const DAY_SECONDS = 210;
+  const HOUR_FROM = 5, HOUR_TO = 23;
+  const hourFix = q.has('hour') ? Math.max(0, Math.min(24, parseFloat(q.get('hour')) || 0)) : null;
+  function hourAt(t) {
+    if (hourFix != null) return hourFix;
+    const u = ((t / DAY_SECONDS) % 1 + 1) % 1;
+    return HOUR_FROM + u * (HOUR_TO - HOUR_FROM);
+  }
 
   // 运行期错误落到标题里，便于无头截图排查
   root.addEventListener('error', function (e) {
@@ -64,11 +73,11 @@
 
   const camera = new THREE.PerspectiveCamera(36, root.innerWidth / Math.max(1, root.innerHeight), 4, 3400);
 
-  let world, fleet, rig, pipe, ui;
+  let world, fleet, rig, pipe, ui, sky, day;
   try {
     FL.createEnvironment(scene, renderer);
     world = FL.buildWorld(scene);
-    FL.createSky(scene, world);
+    sky = FL.createSky(scene, world);
     fleet = FL.buildFleet(scene);
     rig = FL.createCameraRig(camera, canvas);
     const camId = q.get('cam');
@@ -77,6 +86,7 @@
     const pan = (q.get('pan') || '').split(',').map(Number);
     if (pan.length === 2 && isFinite(pan[0]) && isFinite(pan[1])) rig.panTo(pan[0], pan[1], true);
     pipe = FL.createPipeline(renderer, { enabled: fxOn });
+    day = FL.createDay(scene, world, sky, pipe);
     ui = uiOn ? FL.createUI(fleet, rig) : { update: function () {}, reveal: function () {} };
   } catch (err) {
     fail(err);
@@ -121,17 +131,25 @@
       l.sprite.position.y = l.base + Math.sin(simTime * 0.8 + i * 1.7) * 0.32;
     }
 
+    const hour = hourAt(simTime);
+    const phase = day.setHour(hour);
     for (let i = 0; i < world.pointLights.length; i++) {
       const pl = world.pointLights[i];
-      pl.intensity = pl.userData.base * (0.95 + 0.05 * Math.sin(simTime * 2.3 + i * 2.1));
+      const base = pl.userData.dayBase == null ? pl.userData.base : pl.userData.dayBase;
+      pl.intensity = base * (0.94 + 0.06 * Math.sin(simTime * 2.3 + i * 2.1));
     }
 
     fleet.update(fixed != null ? 0 : dt);
-    ui.update(simTime, fleet.stageSet());
+    ui.update(hour, fleet.stageSet(), phase);
     rig.update(dt);
 
     pipe.render(scene, camera, simTime);
 
+    if (q.get('dbg') && frames === 1) {
+      document.title = 'h=' + hour.toFixed(2) +
+        ' f=' + (phase ? phase.night.toFixed(2) + '/' + phase.dusk.toFixed(2) + '/' + phase.day.toFixed(2) : 'null') +
+        ' key=' + world.lights.moon.intensity.toFixed(2) + ' hemi=' + world.lights.hemi.intensity.toFixed(2);
+    }
     if (frames === 1) ui.reveal();
     frames++;
     root.requestAnimationFrame(frame);
@@ -139,5 +157,5 @@
 
   root.requestAnimationFrame(frame);
 
-  root.FL_APP = { scene: scene, camera: camera, renderer: renderer, world: world, fleet: fleet, rig: rig };
+  root.FL_APP = { scene: scene, camera: camera, renderer: renderer, world: world, fleet: fleet, rig: rig, day: day };
 })(window);

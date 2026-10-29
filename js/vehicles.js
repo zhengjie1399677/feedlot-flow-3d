@@ -280,13 +280,13 @@
    * ============================================================ */
   FL.buildFleet = function (scene) {
     const specs = [
-      { id: 'cattle', route: 'cattleTruck', build: buildStockTruck, speed: 7.6, phase: 26, color: 0xffc46b,
+      { id: 'cattle', route: 'cattleTruck', build: buildStockTruck, speed: 10.4, phase: 26, color: 0xffc46b,
         P: { paint: 0xcdd6d6, accent: 0x2f7f8a } },
-      { id: 'forage', route: 'forageTruck', build: buildForageTruck, speed: 7.0, phase: 9, color: 0x9de07a,
+      { id: 'forage', route: 'forageTruck', build: buildForageTruck, speed: 9.6, phase: 9, color: 0x9de07a,
         P: { paint: 0xa8493a, accent: 0xd9b25e } },
-      { id: 'tmr', route: 'tmrTruck', build: buildTmrTruck, speed: 5.6, phase: 46, color: 0xff9a52,
+      { id: 'tmr', route: 'tmrTruck', build: buildTmrTruck, speed: 7.8, phase: 46, color: 0xff9a52,
         P: { paint: 0x4a6b52, accent: 0xd4762d } },
-      { id: 'out', route: 'outboundTruck', build: buildStockTruck, speed: 8.2, phase: 6, color: 0xff7f9e,
+      { id: 'out', route: 'outboundTruck', build: buildStockTruck, speed: 11.2, phase: 6, color: 0xff7f9e,
         P: { paint: 0xe4e1d7, accent: 0xa63c32 } },
     ];
 

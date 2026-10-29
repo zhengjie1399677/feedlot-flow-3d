@@ -346,6 +346,7 @@
     const sp = U.sprite(0xffc98a, 4.2, 0.55);
     sp.position.set(hx, h - 0.28, hz);
     world.group.add(sp);
+    world.lampSprites.push(sp);
     if (warm) world.lampHeads.push({ x: hx, z: hz });
   }
 
@@ -525,6 +526,9 @@
       [-20, 5.2, -58, 0xffb066, 95, 34],
       [28, 5.2, -58, 0xffb066, 95, 34],
       [76, 5.2, -58, 0xffb066, 95, 34],
+      [-20, 5.2, -32, 0xffb066, 95, 34],
+      [28, 5.2, -32, 0xffb066, 95, 34],
+      [76, 5.2, -32, 0xffb066, 95, 34],
       [106, 5.0, -69, 0xffb878, 150, 36],
     ];
     world.pointLights = [];
@@ -534,7 +538,7 @@
       scene.add(pl);
       world.pointLights.push(pl);
     }
-    world.lights = { hemi, moon, warm };
+    world.lights = { hemi, moon, warm, fill };
   }
 
   /* ---------------- 地面光斑合并 ---------------- */
@@ -563,6 +567,7 @@
       const mesh = new THREE.Mesh(U.merge(groups[key]), mat);
       mesh.renderOrder = 2;
       world.group.add(mesh);
+      world.poolMats.push(mat);
     }
   }
 
@@ -587,6 +592,7 @@
     g.position.set(0, -13.6, cz);
     g.renderOrder = 1;
     world.group.add(g);
+    world.baseGlowMat = g.material;
 
   }
 
@@ -598,6 +604,9 @@
       labels: [],
       pools: [],
       lampHeads: [],
+      lampSprites: [],
+      poolMats: [],
+      baseGlowMat: null,
       pointLights: [],
     };
     scene.add(world.group);

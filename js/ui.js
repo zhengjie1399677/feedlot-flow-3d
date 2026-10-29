@@ -84,13 +84,22 @@
       });
     }
 
-    /* 时钟：从 03:18 开始，跟着动画走 */
-    const base = 3 * 3600 + 18 * 60;
+    /* 时钟：跟着昼夜循环走 */
+    const phaseEl = document.getElementById('phase');
     let lastClock = '';
     let lastKey = '';
+    let lastPhase = '';
+
+    function phaseOf(hour) {
+      if (hour < 6.2) return ['黎明', 'DAWN'];
+      if (hour < 9.5) return ['清晨', 'MORNING'];
+      if (hour < 16.5) return ['白天', 'DAY'];
+      if (hour < 19.6) return ['黄昏', 'DUSK'];
+      return ['夜间', 'NIGHT'];
+    }
 
     const api = {
-      update: function (time, stages) {
+      update: function (hour, stages) {
         const key = stages ? Array.from(stages).sort().join('|') : '';
         if (key !== lastKey) {
           lastKey = key;
@@ -98,11 +107,18 @@
             el.classList.toggle('on', !!(stages && stages.has(id)));
           }
         }
-        const sec = Math.floor((base + time) % 86400);
+        const hh = ((hour % 24) + 24) % 24;
+        const sec = Math.floor(hh * 3600);
         const txt = pad(Math.floor(sec / 3600)) + ':' + pad(Math.floor((sec % 3600) / 60)) + ':' + pad(sec % 60);
         if (txt !== lastClock) {
           lastClock = txt;
           clockEl.textContent = txt;
+        }
+        const ph = phaseOf(hh);
+        const phTxt = ph[0] + ' ' + ph[1];
+        if (phTxt !== lastPhase) {
+          lastPhase = phTxt;
+          if (phaseEl) phaseEl.textContent = phTxt;
         }
       },
       reveal: function () {

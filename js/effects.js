@@ -49,70 +49,82 @@
 
   /* ---------------- 天空 / 星空 / 灯柱 ---------------- */
   FL.createSky = function (scene, world) {
-    const skyGeo = new THREE.SphereGeometry(1200, 32, 20);
-    const skyMat = new THREE.ShaderMaterial({
-      side: THREE.BackSide,
-      depthWrite: false,
-      fog: false,
-      uniforms: {
-        uMoon: { value: new THREE.Vector3(-0.52, 0.18, 0.83).normalize() },
-      },
-      vertexShader:
-        'varying vec3 vDir;\n' +
-        'void main(){\n' +
-        '  vec4 wp = modelMatrix * vec4(position,1.0);\n' +
-        '  vDir = normalize(wp.xyz);\n' +
-        '  gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);\n' +
-        '}',
-      fragmentShader:
-        'varying vec3 vDir;\n' +
-        'uniform vec3 uMoon;\n' +
-        'void main(){\n' +
-        '  float h = vDir.y;\n' +
-        '  vec3 top = vec3(0.008,0.015,0.030);\n' +
-        '  vec3 mid = vec3(0.030,0.048,0.075);\n' +
-        '  vec3 hor = vec3(0.085,0.085,0.080);\n' +
-        '  vec3 col = mix(hor, mid, smoothstep(-0.02, 0.24, h));\n' +
-        '  col = mix(col, top, smoothstep(0.18, 0.8, h));\n' +
-        '  float az = max(0.0, dot(normalize(vec3(vDir.x,0.0,vDir.z)), normalize(vec3(uMoon.x,0.0,uMoon.z))));\n' +
-        '  col += vec3(0.10,0.075,0.045) * pow(az,5.0) * (1.0 - smoothstep(0.05,0.42,h)) * smoothstep(-0.06,0.02,h);\n' +
-        // 月亮与光晕
-        '  vec3 md = normalize(vec3(-0.16, 0.30, -0.94));\n' +
-        '  float m = dot(normalize(vDir), md);\n' +
-        '  col += vec3(0.55,0.62,0.78) * (smoothstep(0.99955, 0.99985, m) * 1.15);\n' +
-        '  col += vec3(0.10,0.13,0.20) * pow(max(m,0.0), 90.0);\n' +
-        '  col += vec3(0.045,0.055,0.08) * pow(max(m,0.0), 12.0);\n' +
-        '  col = mix(vec3(0.012,0.017,0.022), col, smoothstep(-0.22, -0.02, h));\n' +
-        '  gl_FragColor = vec4(col,1.0);\n' +
-        '}',
+    // 天空穹顶用顶点色（MeshBasicMaterial），不用自定义 shader：
+    // 之前那版 ShaderMaterial 在真机 ANGLE 上会整片发黑，排查成本太高。
+    const skyGeo = new THREE.SphereGeometry(1200, 48, 28);
+    const posAttr = skyGeo.attributes.position;
+    const colors = new Float32Array(posAttr.count * 3);
+    skyGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    const skyMat = new THREE.MeshBasicMaterial({
+      side: THREE.BackSide, vertexColors: true, depthWrite: false, fog: false, toneMapped: false,
     });
     const sky = new THREE.Mesh(skyGeo, skyMat);
     sky.renderOrder = -10;
     sky.frustumCulled = false;
     scene.add(sky);
 
+    const dirs = [];
+    for (let i = 0; i < posAttr.count; i++) {
+      dirs.push(new THREE.Vector3(posAttr.getX(i), posAttr.getY(i), posAttr.getZ(i)).normalize());
+    }
+
+    const tmpA = new THREE.Color();
+    const tmpB = new THREE.Color();
+    const smooth = function (a, b, x) {
+      const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+      return t * t * (3 - 2 * t);
+    };
+
+    // 日/月圆盘：一张径向渐变的软圆片，贴在穹顶上朝向球心
+    const discTex = (function () {
+      const cv = document.createElement('canvas');
+      cv.width = 128; cv.height = 128;
+      const ctx = cv.getContext('2d');
+      const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+      g.addColorStop(0.0, 'rgba(255,255,255,1)');
+      g.addColorStop(0.34, 'rgba(255,255,255,1)');
+      g.addColorStop(0.52, 'rgba(255,255,255,0.22)');
+      g.addColorStop(1.0, 'rgba(255,255,255,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, 128, 128);
+      const t = new THREE.CanvasTexture(cv);
+      t.colorSpace = THREE.SRGBColorSpace;
+      return t;
+    })();
+    const makeDisc = function (size, color) {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size),
+        new THREE.MeshBasicMaterial({
+          map: discTex, color: color, transparent: true, opacity: 0,
+          depthWrite: false, blending: THREE.AdditiveBlending, fog: false, toneMapped: false,
+        }));
+      m.frustumCulled = false;
+      m.renderOrder = -9;
+      scene.add(m);
+      return m;
+    };
+    const sunDisc = makeDisc(170, 0xffe6bd);
+    const moonDisc = makeDisc(96, 0xdfe9ff);
+
     // 星空
     const N = 520;
-    const pos = new Float32Array(N * 3);
+    const sp = new Float32Array(N * 3);
     const rnd = U.rng(771);
     for (let i = 0; i < N; i++) {
       const a = rnd() * Math.PI * 2;
       const y = 0.12 + rnd() * 0.85;
       const r = Math.sqrt(1 - y * y);
       const R = 1000;
-      pos[i * 3] = Math.cos(a) * r * R;
-      pos[i * 3 + 1] = y * R;
-      pos[i * 3 + 2] = Math.sin(a) * r * R;
+      sp[i * 3] = Math.cos(a) * r * R;
+      sp[i * 3 + 1] = y * R;
+      sp[i * 3 + 2] = Math.sin(a) * r * R;
     }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    const stars = new THREE.Points(
-      g,
-      new THREE.PointsMaterial({
-        color: 0xadc8e8, size: 1.7, sizeAttenuation: false, transparent: true,
-        opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
-      })
-    );
+    const starGeo = new THREE.BufferGeometry();
+    starGeo.setAttribute('position', new THREE.BufferAttribute(sp, 3));
+    const starMat = new THREE.PointsMaterial({
+      color: 0xadc8e8, size: 1.7, sizeAttenuation: false, transparent: true,
+      opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
+    });
+    const stars = new THREE.Points(starGeo, starMat);
     stars.frustumCulled = false;
     scene.add(stars);
 
@@ -157,6 +169,49 @@
     }
 
     scene.fog = new THREE.FogExp2(0x070c13, 0.0016);
+
+    const api = {
+      mesh: sky,
+      dirs: dirs,
+      stars: stars,
+      coneMat: coneMat,
+      mat: skyMat,
+      sunDisc: sunDisc,
+      moonDisc: moonDisc,
+      // 三色渐变 + 地平线方位辉光，逐顶点着色
+      setSky: function (top, mid, hor, glowCol, glowAz, glowI) {
+        for (let i = 0; i < dirs.length; i++) {
+          const d = dirs[i];
+          const y = d.y;
+          tmpA.copy(hor).lerp(mid, smooth(0.0, 0.075, y)).lerp(top, smooth(0.10, 0.55, y));
+          const gx = glowAz.x === undefined ? glowAz.r : glowAz.x;
+          const gz = glowAz.z === undefined ? glowAz.b : glowAz.z;
+          const az = Math.max(0, d.x * gx + d.z * gz);
+          const band = (1 - smooth(0.05, 0.42, y)) * smooth(-0.06, 0.02, y);
+          tmpB.copy(glowCol).multiplyScalar(Math.pow(az, 5) * band * glowI);
+          colors[i * 3] = tmpA.r + tmpB.r;
+          colors[i * 3 + 1] = tmpA.g + tmpB.g;
+          colors[i * 3 + 2] = tmpA.b + tmpB.b;
+        }
+        skyGeo.attributes.color.needsUpdate = true;
+      },
+      setSun: function (dir, color, scale, opacity) {
+        sunDisc.position.copy(dir).normalize().multiplyScalar(1120);
+        sunDisc.lookAt(0, 0, 0);
+        sunDisc.material.color.copy(color);
+        sunDisc.material.opacity = Math.min(1, Math.max(0, opacity));
+        sunDisc.scale.setScalar(scale);
+      },
+      setMoon: function (dir, scale, opacity) {
+        moonDisc.position.copy(dir).normalize().multiplyScalar(1120);
+        moonDisc.lookAt(0, 0, 0);
+        moonDisc.material.opacity = Math.min(1, Math.max(0, opacity));
+        moonDisc.scale.setScalar(scale);
+      },
+    };
+    world.sky = api;
+    world.coneMat = coneMat;
+    return api;
   };
 
   /* ---------------- 相机 ---------------- */
@@ -483,6 +538,7 @@
         blurB.setSize(bw, bh);
         compMat.uniforms.uAspect.value = w / h;
       },
+      setExposure: function (v) { compMat.uniforms.uExposure.value = v; },
       render: function (scene, camera, time) {
         if (!enabled) {
           renderer.setRenderTarget(null);
