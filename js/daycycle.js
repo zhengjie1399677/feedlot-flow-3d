@@ -127,7 +127,7 @@
       }
       key.position.copy(sunPos).lerp(moonPos, nightF);
       key.color.copy(blend(P.night.key, P.dusk.key, dayKey, nightF, dayF));
-      key.intensity = 6.4 * nightF + (1 - nightF) * (dayI * dayF + 1.7 * duskF);
+      key.intensity = 6.4 * nightF + (1 - nightF) * (dayI * dayF + 2.6 * duskF);
 
       /* ---- 环境光 / 暖补光 / 侧补光 ---- */
       hemi.color.copy(blend(P.night.sky, P.dusk.sky, P.day.sky, nightF, dayF));
@@ -154,7 +154,7 @@
         scene.fog.color.copy(blend(P.night.fog, P.dusk.fog, P.day.fog, nightF, dayF));
         scene.fog.density = 0.0016 * nightF + 0.0009 * duskF + 0.00045 * dayF;
       }
-      if (pipe && pipe.setExposure) pipe.setExposure(1.36 * nightF + 1.10 * duskF + 1.02 * dayF);
+      if (pipe && pipe.setExposure) pipe.setExposure(1.36 * nightF + 1.18 * duskF + 1.06 * dayF);
 
       // 供 UI 判断时段
       return { night: nightF, dusk: duskF, day: dayF };

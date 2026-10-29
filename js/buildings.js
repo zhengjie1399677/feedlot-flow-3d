@@ -155,7 +155,8 @@
     };
   }
 
-  function buildBarn(kit, M, world, b) {
+  function buildBarn(kit, M, world, b, roofKit) {
+    const rk = roofKit || kit;
     const cx = b.cx, cz = b.cz, len = b.len, dep = b.dep;
     const mir = !!b.mirror;
     // 非几何挂件（标签/光片/光斑）不在 kit 里，需要自己按镜像位摆放
@@ -208,25 +209,25 @@
     const rise = ridge - eave;
     const slopeLen = Math.hypot(slopeH, rise) + 0.25;
     const ang = Math.atan2(rise, slopeH);
-    U.box(kit, roofMat, len + 1.8, 0.22, slopeLen, cx, (eave + ridge) / 2, cz + slopeH / 2, ang, 0, 0);
-    U.box(kit, roofMat, len + 1.8, 0.22, slopeLen, cx, (eave + ridge) / 2, cz - slopeH / 2, -ang, 0, 0);
-    U.box(kit, roofMat, len + 2.0, 0.3, 0.62, cx, ridge + 0.12, cz, 0, 0, 0);
+    U.box(rk, roofMat, len + 1.8, 0.22, slopeLen, cx, (eave + ridge) / 2, cz + slopeH / 2, ang, 0, 0);
+    U.box(rk, roofMat, len + 1.8, 0.22, slopeLen, cx, (eave + ridge) / 2, cz - slopeH / 2, -ang, 0, 0);
+    U.box(rk, roofMat, len + 2.0, 0.3, 0.62, cx, ridge + 0.12, cz, 0, 0, 0);
     // 屋脊通风器：抬高的百叶脊
-    U.box(kit, M.galv, len - 1.2, 0.62, 1.06, cx, ridge + 0.45, cz, 0, 0, 0, 0.06);
-    U.box(kit, M.steel, len - 1.0, 0.12, 1.22, cx, ridge + 0.13, cz);
+    U.box(rk, M.galv, len - 1.2, 0.62, 1.06, cx, ridge + 0.45, cz, 0, 0, 0, 0.06);
+    U.box(rk, M.steel, len - 1.0, 0.12, 1.22, cx, ridge + 0.13, cz);
     for (let s2 = 0; s2 < 3; s2++) {
-      U.box(kit, M.steel, len - 1.5, 0.07, 0.07, cx, ridge + 0.30 + s2 * 0.15, cz + 0.5);
-      U.box(kit, M.steel, len - 1.5, 0.07, 0.07, cx, ridge + 0.30 + s2 * 0.15, cz - 0.5);
+      U.box(rk, M.steel, len - 1.5, 0.07, 0.07, cx, ridge + 0.30 + s2 * 0.15, cz + 0.5);
+      U.box(rk, M.steel, len - 1.5, 0.07, 0.07, cx, ridge + 0.30 + s2 * 0.15, cz - 0.5);
     }
-    U.box(kit, roofMat, len - 0.5, 0.15, 1.28, cx, ridge + 0.80, cz);
+    U.box(rk, roofMat, len - 0.5, 0.15, 1.28, cx, ridge + 0.80, cz);
     // 采光带：南坡每跨一条
     for (let s3 = 0; s3 < 7; s3++) {
       const sx = cx - halfL + 3.4 + s3 * ((len - 6.8) / 6);
-      U.box(kit, M.skylight, 2.4, 0.1, slopeLen * 0.60, sx, (eave + ridge) / 2 + 0.12, cz + slopeH / 2, ang, 0, 0);
+      U.box(rk, M.skylight, 2.4, 0.1, slopeLen * 0.60, sx, (eave + ridge) / 2 + 0.12, cz + slopeH / 2, ang, 0, 0);
     }
     // 檐口
-    U.box(kit, M.timber, len + 2.0, 0.4, 0.22, cx, eave + 0.04, zf + o + 0.02);
-    U.box(kit, M.timber, len + 2.0, 0.4, 0.22, cx, eave + 0.04, zb - o - 0.02);
+    U.box(rk, M.timber, len + 2.0, 0.4, 0.22, cx, eave + 0.04, zf + o + 0.02);
+    U.box(rk, M.timber, len + 2.0, 0.4, 0.22, cx, eave + 0.04, zb - o - 0.02);
     // 檐下暖光槽
     U.box(kit, M.warmGlow, len - 2, 0.06, 0.1, cx, eave - 0.35, zf + 0.18, 0, 0, 0);
 
@@ -280,6 +281,17 @@
       kit.add(bulb, M.lamp, U.mat4(lx, 5.42, cz, 0, 0, 0));
       glowSprite(world, 0xffc180, 3.4, mx(lx), 5.35, cz, 0.4);
     }
+    // 舍内屋架：剖视时露出来的结构
+    for (let t = 0; t <= 6; t++) {
+      const tx = cx - halfL + 1.6 + t * ((len - 3.2) / 6);
+      U.box(kit, M.steel, 0.14, (ridge - eave) * 0.55, 0.14, tx, eave + (ridge - eave) * 0.28, cz, 0, 0, 0);
+      U.box(kit, M.steel, 0.14, 0.14, dep - 1.2, tx, eave + 0.1, cz);
+      U.box(kit, M.timber, 0.12, 0.16, dep - 1.4, tx, eave + 0.26, cz);
+    }
+    // 舍内地面：中间走道 + 两侧垫料
+    U.box(kit, M.penPad, len - 2.4, 0.06, 2.6, cx, 0.82, cz, 0, 0, 0);
+    U.box(kit, M.hay, len - 2.4, 0.05, 3.4, cx, 0.81, cz + 4.6);
+    U.box(kit, M.hay, len - 2.4, 0.05, 3.4, cx, 0.81, cz - 4.6);
     // 舍内顶部灯带（跟着夜色亮起）
     U.box(kit, M.warmGlow, len - 3.4, 0.1, 0.1, cx, eave - 0.55, cz + 2.2);
     U.box(kit, M.warmGlow, len - 3.4, 0.1, 0.1, cx, eave - 0.55, cz - 3.4);
@@ -1334,7 +1346,13 @@
     M.lamp.userData.noShadow = true;
     M.redBeam.userData.noShadow = true;
 
-    for (const b of L.barns) buildBarn(b.mirror ? mirrorKit(kit, b.cx, b.cz) : kit, M, world, b);
+    const roofKit = new U.Kit();
+    for (const b of L.barns) buildBarn(b.mirror ? mirrorKit(kit, b.cx, b.cz) : kit, M, world, b, roofKit);
+    const roofGroup = new THREE.Group();
+    roofGroup.name = 'barnRoofs';
+    roofKit.build(roofGroup, { name: 'barnRoofs' });
+    world.group.add(roofGroup);
+    world.barnRoofs = roofGroup;
     buildRamp(kit, M, world);
     buildWeigh(kit, M, world);
     buildGate(kit, M, world);

@@ -64,6 +64,25 @@
       viewEls.set(cam.id, btn);
     });
 
+    /* 剖视开关：收起牛舍屋顶，露出舍内 */
+    const cutState = { on: true, onChange: null };
+    const cutBtn = document.createElement('button');
+    cutBtn.type = 'button';
+    cutBtn.className = 'cut';
+    cutBtn.title = '收起 / 放下牛舍屋顶（快捷键 R）';
+    cutBtn.innerHTML = '<span class="k">R</span><span></span>';
+    cutBtn.querySelector('span:last-child').textContent = '剖视';
+    function applyCut(on) {
+      cutState.on = on;
+      cutBtn.classList.toggle('on', on);
+      if (cutState.onChange) cutState.onChange(on);
+    }
+    cutBtn.addEventListener('click', function () { applyCut(!cutState.on); });
+    viewsEl.appendChild(cutBtn);
+    root.addEventListener('keydown', function (e) {
+      if (e.key === 'r' || e.key === 'R') applyCut(!cutState.on);
+    });
+
     function setActiveView(id) {
       for (const [key, el] of viewEls) el.classList.toggle('on', key === id);
     }
@@ -99,6 +118,8 @@
     }
 
     const api = {
+      setCutaway: applyCut,
+      onCutaway: function (fn) { cutState.onChange = fn; },
       update: function (hour, stages) {
         const key = stages ? Array.from(stages).sort().join('|') : '';
         if (key !== lastKey) {

@@ -15,11 +15,13 @@
   // 昼夜：一个循环 DAY_SECONDS 秒，从 05:00 走到 23:00（夜色的两端都是深夜，循环处看不出来）
   const DAY_SECONDS = 210;
   const HOUR_FROM = 5, HOUR_TO = 23;
+  const HOUR_START = 15.4;   // 从下午起跑，很快走到黄昏
   const hourFix = q.has('hour') ? Math.max(0, Math.min(24, parseFloat(q.get('hour')) || 0)) : null;
   function hourAt(t) {
     if (hourFix != null) return hourFix;
     const u = ((t / DAY_SECONDS) % 1 + 1) % 1;
-    return HOUR_FROM + u * (HOUR_TO - HOUR_FROM);
+    const span = HOUR_TO - HOUR_FROM;
+    return HOUR_FROM + ((HOUR_START - HOUR_FROM + u * span) % span);
   }
 
   // 运行期错误落到标题里，便于无头截图排查
@@ -89,7 +91,14 @@
     if (pan.length === 2 && isFinite(pan[0]) && isFinite(pan[1])) rig.panTo(pan[0], pan[1], true);
     pipe = FL.createPipeline(renderer, { enabled: fxOn });
     day = FL.createDay(scene, world, sky, pipe);
-    ui = uiOn ? FL.createUI(fleet, rig) : { update: function () {}, reveal: function () {} };
+    ui = uiOn ? FL.createUI(fleet, rig) : { update: function () {}, reveal: function () {}, setCutaway: function () {}, onCutaway: function () {} };
+    // 剖视：默认收起牛舍屋顶（?roof=1 保留屋顶），与 UI 是否开启无关
+    const cutOn = q.get('roof') !== '1';
+    if (world.barnRoofs) world.barnRoofs.visible = !cutOn;
+    if (ui.onCutaway) {
+      ui.onCutaway(function (on) { if (world.barnRoofs) world.barnRoofs.visible = !on; });
+      ui.setCutaway(cutOn);
+    }
   } catch (err) {
     fail(err);
     return;

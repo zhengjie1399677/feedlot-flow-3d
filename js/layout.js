@@ -261,7 +261,7 @@
     ],
 
     cameras: [
-      { id: 'overview', label: '全览', target: [-2, 1, -9], theta: 0.66, phi: 0.72, zoom: 0.86 },
+      { id: 'overview', label: '全览', target: [-2, 1, -12], theta: 0.66, phi: 0.78, zoom: 0.93 },
       { id: 'gate', label: '大门', target: [-104, 7, 56], theta: -1.15, phi: 0.95, zoom: 2.8 },
       { id: 'weigh', label: '地磅', target: [-84, 5, 56], theta: 0.30, phi: 0.92, zoom: 3.0 },
       { id: 'tmr', label: '配料', target: [-96, 9, -14], theta: 0.62, phi: 0.92, zoom: 2.3 },

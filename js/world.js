@@ -158,6 +158,7 @@
     M.tarp = S({ map: T.tarp, color: 0xb2ad9a, roughness: 0.85 });
     M.film = S({ map: T.tarp, color: 0xd9d7cd, roughness: 0.55 });
     M.dirt = S({ color: 0x2b251a, roughness: 1 });
+    M.compact = S({ map: T.concrete, color: 0x8f8069, roughness: 1 });
     M.water = S({ color: 0x18343c, roughness: 0.05, metalness: 0.9 });
     M.red = S({ color: 0x8d3a30, roughness: 0.55 });
     M.blue = S({ color: 0x2e4d63, roughness: 0.55 });
@@ -187,10 +188,16 @@
     // 草皮
     flatRound(kit, M.grass, 252, 192, 0, cz, 0.04, 6, 10);
     // 场地
-    flatRound(kit, M.apronEdge, 244, 180, 0, -4, 0.16, 13, 12);
-    flatRound(kit, M.apron, 240, 176, 0, -4, 0.2, 12, 12);
+    flatRound(kit, M.apronEdge, 232, 168, 0, -4, 0.16, 13, 12);
+    flatRound(kit, M.apron, 228, 164, 0, -4, 0.2, 12, 12);
     // 场内水泥分区（配料场院）
     flatRound(kit, M.yard, 56, 74, -92, -4, 0.215, 5, 9);
+    // 生产区：六栋牛舍下面铺压实土
+    flatRound(kit, M.compact, 156, 76, 24, -46, 0.206, 8, 9);
+    // 日粮道（两排牛舍之间）压回混凝土
+    flatRound(kit, M.apron, 152, 9.0, 24, -44, 0.209, 3.6, 8);
+    // 装车区前场土带
+    flatRound(kit, M.compact, 34, 22, 100, -52, 0.207, 6, 8);
     // 出场装车区硬化
     flatRound(kit, M.yard, 26, 26, 104, -69, 0.215, 4, 9);
   }
