@@ -53,7 +53,10 @@ python -m http.server 8080
 
 - **园区**：254×194 米地块，有厚度的地台（不是无限网格），**六栋育肥牛舍**（三栋朝南、三栋隔着日粮道朝北；屋脊百叶通风器 + 每跨采光带，南北两排屋面颜色分开，前脸卷帘半开露出料槽与颈夹，舍内有灯带和牛；门洞暖光、背面高位通风格栅）、卸牛台、地磅与磅房、大门门卫、综合楼、TMR 配料中心 + 三只原料筒仓 + 青贮窖（覆膜 + 压胎）、出栏装车台、路灯、树。
 - **生产区与交易区**：一道 2.4 米高的围墙把牛舍区隔开，留一处车行大门（挂着"生产区 · 谢绝参观"）和一处人行小门；围墙南侧是**活牛交易中心**——玻璃幕墙的交易大厅（行情屏写着当日活牛价与成交头数）、六格待售栏（料槽、水槽、栏间过道灯）、装牛台和一辆停着的活牛车、交易地磅、四个彩色雨棚摊位、彩旗和中央花池；交易中心东侧是**员工停车场**（两排车位、四十来台车、四盏车位灯），大厅门口还有几台临停；南侧临路是三层**员工办公楼**（中部塔楼 + 通高中庭 + 柱廊，双面开窗，夜里整栋亮着）。
-- **牛**：66 头（交易栏 18 + 六栋牛舍舍内各 8），西门塔尔那样的黄白花；每头朝向、大小、毛色深浅都略有差别，并且会慢慢地动（呼吸、甩尾、低头）——动画是把 Idle 循环烘成 6 帧顶点，运行时 6 个 InstancedMesh 轮换帧号，**不需要蒙皮、不需要服务器、不解析 GLTF**。
+- **牛**：66 头（交易栏 18 + 六栋牛舍舍内各 8），西门塔尔那样的黄褐白花。
+  - 走 `http://` 时：GLTFLoader 载入 `vendor/models/cow_polyfork.glb`，SkeletonUtils 克隆 66 份，每头一个 `AnimationMixer` 播 Idle —— 真·骨骼动画（呼吸、甩尾、低头）。
+  - 双击 `file://` 打开时：浏览器不让跑 ES module / fetch 本地文件，自动退回 `js/cow-asset.js` 里预先烘好的 6 帧顶点，用 6 个 InstancedMesh 轮换，同样会动，只是没有骨骼插值那么顺。
+  - 两条路共用一套配色映射：按顶点亮度把黑白花重映射成西门塔尔的黄褐 + 白（`recolor()`）。
 - **车**：活牛运输车（栅栏车厢）、草料自卸车（草捆 + 篷布）、TMR 日粮车（拖拉机 + 卧式搅拌罐）、出栏平板车。车按弧长路线跑，到站点会停留（过磅 3s、卸青贮 9s、卸牛 10s、投料 6s×6 站、装车 10s），停靠时地面上会亮起作业光斑并浮出作业标签。
 - **流向**：五组加法混合的流光带（进场 / 草料 / 牛只 / 日粮 / 出栏），用 `uTime` 驱动脉冲前进，配合路面黄色中线一起指出方向。
 - **昼夜**：`js/daycycle.js` 把一天拆成深夜 / 晨昏 / 白天三套配色做连续插值——天空穹顶的顶点色、太阳与月亮的方位和光色、半球光、雾的颜色与浓度、曝光、场内灯具与地面光斑的亮度全部同步，太阳落下去时场灯和窗户一点点亮起来。
@@ -68,7 +71,9 @@ css/style.css       深色工业风界面（标题 / 图例 / 视角 / 流程条
 js/utils.js         程序化贴图、倒角盒、几何合并 Kit、文字贴图、曲线 Path、补间
 js/layout.js        唯一的数据源：地块、路网、车辆路线、流向带、六个阶段、镜头预设
 js/world.js         地面 / 道路 / 围栏 / 灯杆 / 树 / 标签 / 灯光 / 地面光池
-js/cows.js          牛群（InstancedMesh，数据来自 js/cow-asset.js）
+js/cows.js          牛群：有 GLTFLoader 时走骨骼动画，否则退回预烘 6 帧
+js/gltf-boot.js     ES module：装载 GLTFLoader + SkeletonUtils（只在 http 下生效）
+server.js           零依赖静态服务器（本地开发用，node server.js）
 js/buildings.js     牛舍、地磅、大门、办公室、TMR 车间与筒仓、卸牛台、装车台、交易中心、员工楼、停车场、围墙
 js/vehicles.js      车辆造型 + 运动物理（加减速 / 跟车让行 / 刹车灯 / 转向灯）
 js/effects.js       环境贴图、天空穹顶与星空、相机轨道、泛光管线
@@ -106,33 +111,38 @@ MIT。拿去随便用，商用、改、闭源分发都行，只要保留 LICENSE
 - 牛模型：[polyfork.dev · Cow base](https://polyfork.dev/asset/cow-base)（CC0），用 `tools/_cowpack4.py` 把骨骼动画烘掉、只留绑定姿势的顶点 / 法线 / 顶点色 / 索引，写成 `js/cow-asset.js`；运行时一个 InstancedMesh 装下全部 66 头牛（1 个 draw call），每头用 instanceColor 调一点深浅。
 - 其余建筑、车辆、贴图全部程序化生成，不依赖外部资源。
 
-## 部署
+## 运行与部署
 
-整个页面就是一堆静态文件（`index.html`、`css/`、`js/`、`vendor/three.min.js`），**没有任何后端进程**，
-牛的动作、车辆行驶、昼夜变化全在浏览器里算。所以：
+页面本身还是纯静态（`index.html` + `css/` + `js/` + `vendor/`），但牛群想用真·骨骼动画就需要走 `http://`，
+因为浏览器不允许 `file://` 下加载 ES module 和 fetch 本地 `.glb`。
 
-- 直接双击 `index.html`（`file://`）就能跑；
-- 放到任何静态托管上都能跑（GitHub Pages、对象存储、CDN）；
-- 用 nginx 也是纯静态托管，**不需要反向代理**：
+**本地跑**（工程自带一个零依赖服务器）：
+
+```bash
+node server.js            # 默认 http://127.0.0.1:8080/
+PORT=9000 node server.js  # 换端口
+LOG=1 node server.js      # 打印每条请求，排查 404 用
+```
+
+**放到 nginx**：就是纯静态托管，**不需要反向代理**——
 
 ```nginx
 server {
     listen 80;
     server_name feedlot.example.com;
-    root /var/www/feedlot-flow-3d;   # 把整个工程目录放这里
+    root /var/www/feedlot-flow-3d;
     index index.html;
 
-    location / {
-        try_files $uri $uri/ =404;
-    }
+    location / { try_files $uri $uri/ =404; }
 
-    # 带 ?v= 的静态资源可以放心长缓存
-    location ~* \.(js|css|png|jpg|woff2)$ {
-        expires 30d;
+    location ~* \.(js|css|png|glb|woff2)$ {
+        expires 7d;
         add_header Cache-Control "public";
     }
 }
 ```
 
-反向代理（`proxy_pass`）只有在后面真的有一个 Node/Python 进程时才有意义；这个项目没有，
-所以 `root` 指过去就完事了。
+想反代一个 Node 进程也行（`proxy_pass http://127.0.0.1:8080;`），但这里没有后端逻辑，
+`root` 指过去就完事了。GitHub Pages 同理，直接推上去就能跑（`https://` 下会自动走骨骼动画那条路）。
+
+**双击 `file://`** 也能看，只是牛会退回到预烘的 6 帧版本。
