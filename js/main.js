@@ -94,9 +94,16 @@
     ui = uiOn ? FL.createUI(fleet, rig) : { update: function () {}, reveal: function () {}, setCutaway: function () {}, onCutaway: function () {} };
     // 剖视：默认收起牛舍屋顶（?roof=1 保留屋顶），与 UI 是否开启无关
     const cutOn = q.get('roof') !== '1';
-    if (world.barnRoofs) world.barnRoofs.visible = !cutOn;
+    const applyCut = function (cut) {
+      if (world.barnRoofs) world.barnRoofs.visible = !cut;
+      // 屋顶收起时舍内失去遮蔽：把舍内地面压暗，读起来才像"室内"
+      const M = world.mats || {};
+      if (M.barnPad) M.barnPad.color.setHex(cut ? 0x6d6b64 : 0xb0aea6);
+      if (M.barnStraw) M.barnStraw.color.setHex(cut ? 0x6a6047 : 0x9b8d6a);
+    };
+    applyCut(cutOn);
     if (ui.onCutaway) {
-      ui.onCutaway(function (on) { if (world.barnRoofs) world.barnRoofs.visible = !on; });
+      ui.onCutaway(applyCut);
       ui.setCutaway(cutOn);
     }
   } catch (err) {

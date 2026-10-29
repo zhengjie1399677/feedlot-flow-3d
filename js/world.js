@@ -130,7 +130,7 @@
     M.soil = S({ color: 0x1b1d18, roughness: 1 });
     M.plinth = S({ color: 0x0d100e, roughness: 1 });
     M.grass = S({ map: T.grass, color: 0xb4c296, roughness: 1 });
-    M.apron = S({ map: T.concrete, color: 0x9aa2a4, roughness: 0.92, metalness: 0.02 });
+    M.apron = S({ map: T.concrete, color: 0xa3a8aa, roughness: 0.92, metalness: 0.02 });
     M.apronEdge = S({ map: T.concreteDark, color: 0x6d7376, roughness: 0.95 });
     M.asphalt = S({ map: T.asphalt, color: 0x9fa8ad, roughness: 0.95, metalness: 0.02 });
     M.curb = S({ map: T.concreteDark, color: 0x8b9194, roughness: 0.95 });
@@ -138,11 +138,11 @@
     M.yellow = S({ color: 0xc79b3f, roughness: 0.65, metalness: 0.15 });
     M.yard = S({ map: T.concreteDark, color: 0x7f8588, roughness: 0.95 });
     M.floor = S({ map: T.concrete, color: 0xa8a79e, roughness: 0.9 });
-    M.wall = S({ map: T.concrete, color: 0xcfc4a8, roughness: 0.9 });
-    M.wallCool = S({ map: T.concrete, color: 0x9aa6a8, roughness: 0.9 });
+    M.wall = S({ map: T.concrete, color: 0xc2bcaa, roughness: 0.9 });
+    M.wallCool = S({ map: T.concrete, color: 0x9aa4a6, roughness: 0.9 });
     M.wallDark = S({ map: T.corrugated, color: 0x899da4, roughness: 0.6, metalness: 0.3 });
-    M.roof = S({ map: T.roof, color: 0xb06c48, roughness: 0.6, metalness: 0.22 });
-    M.roofSouth = S({ map: T.roof, color: 0x8a4f45, roughness: 0.62, metalness: 0.2 });
+    M.roof = S({ map: T.roof, color: 0x96604a, roughness: 0.6, metalness: 0.22 });
+    M.roofSouth = S({ map: T.roof, color: 0x7f4f45, roughness: 0.62, metalness: 0.2 });
     M.skylight = S({ map: T.roof, color: 0xd3e2ea, roughness: 0.28, metalness: 0.18 });
     M.roofPlant = S({ map: T.roof, color: 0x9fb3bb, roughness: 0.5, metalness: 0.35 });
     M.timber = S({ color: 0x54402f, roughness: 0.85 });
@@ -158,13 +158,15 @@
     M.tarp = S({ map: T.tarp, color: 0xb2ad9a, roughness: 0.85 });
     M.film = S({ map: T.tarp, color: 0xd9d7cd, roughness: 0.55 });
     M.dirt = S({ color: 0x2b251a, roughness: 1 });
-    M.compact = S({ map: T.concrete, color: 0x8f8069, roughness: 1 });
+    M.compact = S({ map: T.concrete, color: 0x8b8270, roughness: 1 });
     M.water = S({ color: 0x18343c, roughness: 0.05, metalness: 0.9 });
     M.red = S({ color: 0x8d3a30, roughness: 0.55 });
     M.blue = S({ color: 0x2e4d63, roughness: 0.55 });
-    M.hay = S({ color: 0x8f7742, roughness: 1 });
+    M.hay = S({ color: 0x9b8d6a, roughness: 1 });
     // 交易栏圈地面：浅灰垫层，跟黄褐色的牛拉开（原来是黄的，牛也黄，糊成一片）
     M.penPad = S({ map: T.concrete, color: 0xb3b3ad, roughness: 0.95 });
+    M.barnPad = S({ map: T.concrete, color: 0xb0aea6, roughness: 0.96 });
+    M.barnStraw = S({ color: 0x9b8d6a, roughness: 1 });
     M.bark = S({ color: 0x3a2c21, roughness: 0.95 });
     M.leafA = S({ color: 0x243a20, roughness: 0.95 });
     M.leafB = S({ color: 0x2f4a26, roughness: 0.95 });
@@ -251,8 +253,8 @@
             float s = fract((x - uTime * 9.0) / 13.0);
             float pulse = smoothstep(0.0, 0.30, s) * (1.0 - smoothstep(0.34, 0.92, s));
             float edge = smoothstep(0.0, 0.26, vUv.y) * (1.0 - smoothstep(0.74, 1.0, vUv.y));
-            float a = (0.12 + pulse * 0.72) * edge * uOpacity;
-            vec3 c = uColor * (0.55 + pulse * 1.9);
+            float a = (0.09 + pulse * 0.40) * edge * uOpacity;
+            vec3 c = uColor * (0.40 + pulse * 1.05);
             gl_FragColor = vec4(c, a);
           }`,
         transparent: true,
@@ -606,6 +608,7 @@
   FL.buildWorld = function (scene) {
     const world = {
     feedPiles: [],
+      barnShades: [],
       group: new THREE.Group(),
       flows: [],
       labels: [],

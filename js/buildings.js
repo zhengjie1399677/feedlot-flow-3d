@@ -288,10 +288,13 @@
       U.box(kit, M.steel, 0.14, 0.14, dep - 1.2, tx, eave + 0.1, cz);
       U.box(kit, M.timber, 0.12, 0.16, dep - 1.4, tx, eave + 0.26, cz);
     }
+    // 墙顶压边：剖视时这道深色带让"剖开"看起来是故意的，而不是忘了盖顶
+    U.box(kit, M.steelLight, len + 0.16, 0.18, 0.4, cx, eave - 0.03, zf);
+    U.box(kit, M.steelLight, len + 0.16, 0.18, 0.4, cx, eave - 0.03, zf - dep);
     // 舍内地面：中间走道 + 两侧垫料
-    U.box(kit, M.penPad, len - 2.4, 0.06, 2.6, cx, 0.82, cz, 0, 0, 0);
-    U.box(kit, M.hay, len - 2.4, 0.05, 3.4, cx, 0.81, cz + 4.6);
-    U.box(kit, M.hay, len - 2.4, 0.05, 3.4, cx, 0.81, cz - 4.6);
+    U.box(kit, M.barnPad, len - 2.4, 0.06, 2.6, cx, 0.82, cz, 0, 0, 0);
+    U.box(kit, M.barnStraw, len - 2.4, 0.05, 3.4, cx, 0.81, cz + 4.6);
+    U.box(kit, M.barnStraw, len - 2.4, 0.05, 3.4, cx, 0.81, cz - 4.6);
     // 舍内顶部灯带（跟着夜色亮起）
     U.box(kit, M.warmGlow, len - 3.4, 0.1, 0.1, cx, eave - 0.55, cz + 2.2);
     U.box(kit, M.warmGlow, len - 3.4, 0.1, 0.1, cx, eave - 0.55, cz - 3.4);
