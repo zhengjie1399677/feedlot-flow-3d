@@ -75,6 +75,33 @@
     return sp;
   }
 
+  // 接触阴影：贴地的黑色软片（成本极低，但能让建筑"坐"在地面上）
+  function ao(world, w, d, x, z, opacity, rotY) {
+    const m = U.aoPatch(w, d, opacity == null ? 0.34 : opacity);
+    m.position.set(x, 0.207, z);
+    if (rotY) m.rotation.z = rotY;
+    world.group.add(m);
+    return m;
+  }
+
+  /* 全场的接触阴影一次铺好（只按建筑轮廓，不做逐像素 AO） */
+  function buildAO(world) {
+    for (const b of L.barns) ao(world, b.len + 3.0, b.dep + 3.0, b.cx, b.cz, 0.38);
+    ao(world, 27.0, 21.0, -102, -10, 0.40);            // TMR 配料车间
+    ao(world, 10.0, 10.0, -108, -32, 0.32);            // 筒仓
+    ao(world, 10.0, 10.0, -94, -32, 0.32);
+    ao(world, 10.0, 10.0, -80, -32, 0.32);
+    ao(world, 28.0, 11.0, -95, 26, 0.34);              // 青贮窖
+    ao(world, 25.0, 13.0, -84, 56, 0.34);              // 地磅棚
+    ao(world, 15.0, 15.0, -46, -64, 0.30);             // 卸牛台
+    ao(world, 12.0, 17.0, 103.5, -69, 0.32);           // 装车台
+    ao(world, 20.0, 11.0, -110, 77.5, 0.34);           // 综合楼
+    ao(world, 7.0, 6.0, -113.6, 70, 0.28);             // 门卫房
+    const mk = L.market;
+    ao(world, mk.hall.w + 3.0, mk.hall.d + 3.0, mk.hall.cx, mk.hall.cz, 0.36);
+    ao(world, mk.office.w + 3.0, mk.office.d + 3.0, mk.office.cx, mk.office.cz, 0.34);
+  }
+
   function glowSprite(world, color, size, x, y, z, opacity) {
     const s = U.sprite(color, size, opacity == null ? 0.5 : opacity);
     s.position.set(x, y, z);
@@ -208,8 +235,17 @@
     U.box(kit, M.concreteTrough, tlen, 0.3, 1.9, cx, 0.28, tz);
     U.box(kit, M.concreteTrough, tlen, 0.55, 0.18, cx, 0.54, tz - 0.9);
     U.box(kit, M.concreteTrough, tlen, 0.55, 0.18, cx, 0.54, tz + 0.9);
-    U.box(kit, M.feed, tlen - 0.3, 0.1, 1.5, cx, 0.5, tz);
-    U.box(kit, M.feed, tlen - 0.25, 0.16, 1.55, cx, 0.58, tz);
+    // 槽底薄薄一层（永远有），以及随投料长高的日粮堆（独立网格）
+    U.box(kit, M.feed, tlen - 0.3, 0.08, 1.5, cx, 0.47, tz);
+    const pileGeo = new THREE.BoxGeometry(tlen - 0.7, 1, 1.42);
+    pileGeo.translate(0, 0.5, 0);
+    const pile = new THREE.Mesh(pileGeo, M.feedPile || M.feed);
+    pile.position.set(cx, 0.5, tz);
+    pile.scale.y = 0.12;
+    pile.castShadow = true;
+    pile.receiveShadow = true;
+    world.group.add(pile);
+    world.feedPiles.push({ mesh: pile, x: cx, z: tz, idx: b.idx, show: -1 });
 
     // 内部：饮水槽 / 栏杆 / 吊灯
     U.box(kit, M.concreteTrough, 4.6, 0.72, 1.2, cx + 11, 0.95, cz + 5.6);
@@ -324,19 +360,23 @@
       { size: 86, subSize: 36, bg: 'rgba(10,13,16,0.94)', border: 'rgba(255,196,120,0.4)', glow: 'rgba(255,180,90,0.5)', color: '#ffe4bd' });
     glowPlane(world, 13.5, 2.6, g.x + 0.5, 9.0, g.z, Math.PI / 2, new THREE.Color(1.4, 0.8, 0.35), 0.12);
 
-    // 道闸
+    // 道闸：立柱固定，横杆做成独立组（车辆通过时抬起 → 见 main.js）
     const bx = -104.5, bz = g.z + 7.4;
     U.box(kit, M.steel, 0.5, 1.3, 0.5, bx, 0.85, bz);
     U.box(kit, M.yellow, 0.6, 0.2, 0.6, bx, 1.55, bz);
-    const armLen = 7.4;
-    const armAng = -1.15;
-    const y1 = 1.45;
+    const arm = new THREE.Group();
+    arm.position.set(bx, 1.55, bz);
+    const armKit = new U.Kit();
+    const armLen = 7.4, seg = armLen / 7;
     for (let i = 0; i < 7; i++) {
-      const seg = armLen / 7;
-      const zc = bz - Math.cos(armAng) * (i + 0.5) * seg;
-      const yc = y1 + Math.sin(-armAng) * (i + 0.5) * seg;
-      U.box(kit, i % 2 ? M.red : M.line, 0.13, 0.13, seg * 0.98, bx, yc, zc, armAng, 0, 0);
+      U.box(armKit, i % 2 ? M.red : M.line, 0.12, 0.12, seg * 0.96, 0, 0, -(i + 0.5) * seg);
     }
+    armKit.add(new THREE.BoxGeometry(0.16, 0.16, 0.5), M.steel, U.mat4(0, 0, -0.2));
+    armKit.build(arm);
+    arm.traverse(function (o) { if (o.isMesh) o.castShadow = true; });
+    world.group.add(arm);
+    world.gateArm = arm;
+    world.gatePoint = { x: bx, z: bz };
     // 门卫房
     const hx = -113.6, hz = 70.0;
     U.box(kit, M.wallCool, 5.4, 3.2, 4.2, hx, 1.6, hz, 0, 0, 0, 0.06);
@@ -1222,6 +1262,9 @@
     buildStaffOffice(kit, M, world);
     buildParking(kit, M, world);
 
+
+    // 接触阴影
+    buildAO(world);
 
     // 料槽前的日粮光斑（喂料区）
     for (const b of L.barns) {

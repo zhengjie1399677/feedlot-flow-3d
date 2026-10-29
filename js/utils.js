@@ -531,6 +531,47 @@
     return m;
   };
 
+  /* 接触阴影贴图：圆角矩形 + 羽化边缘（一次性生成，所有 AO 片共用） */
+  U.aoTexture = function () {
+    if (U.aoTex) return U.aoTex;
+    const S = 256, pad = 46;
+    const c = makeCanvas(S);
+    const ctx = c.getContext('2d');
+    if (ctx.filter !== undefined) ctx.filter = 'blur(26px)';
+    ctx.fillStyle = 'rgba(0,0,0,0.92)';
+    const r = 34, x = pad, y = pad, w = S - pad * 2, h = S - pad * 2;
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+    ctx.fill();
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    U.aoTex = t;
+    return t;
+  };
+
+  /* 一块接触阴影（贴地、正常混合的黑色软片） */
+  U.aoPatch = function (w, d, opacity, color) {
+    const geo = new THREE.PlaneGeometry(w, d);
+    const mat = new THREE.MeshBasicMaterial({
+      map: U.aoTexture(),
+      color: color == null ? 0x000000 : color,
+      transparent: true,
+      opacity: opacity == null ? 0.34 : opacity,
+      depthWrite: false,
+      toneMapped: false,
+      fog: false,
+    });
+    const m = new THREE.Mesh(geo, mat);
+    m.rotation.x = -Math.PI / 2;
+    m.renderOrder = 2;
+    return m;
+  };
+
   /* ---------------- 路径 ---------------- */
   U.Path = class Path {
     constructor(ways, opts) {

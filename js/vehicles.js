@@ -54,15 +54,20 @@
   function tube(kit, mat, r1, r2, h, seg, x, y, z, rx, ry, rz) {
     return part(kit, mat, new THREE.CylinderGeometry(r1, r2, h, seg || 14), x, y, z, rx, ry, rz);
   }
-  function wheel(kit, m, x, z, r, w) {
-    const g = new THREE.CylinderGeometry(r, r, w, 16, 1);
-    g.rotateZ(Math.PI / 2);
-    g.applyMatrix4(U.mat4(x, r, z));
-    kit.add(g, m.tire);
-    const h = new THREE.CylinderGeometry(r * 0.44, r * 0.44, w + 0.03, 12, 1);
-    h.rotateZ(Math.PI / 2);
-    h.applyMatrix4(U.mat4(x, r, z));
-    kit.add(h, m.steel);
+  // 车轮：独立成组（轮轴沿 X），这样每帧能绕轴自转
+  function wheel(m, x, z, r, w) {
+    const g = new THREE.Group();
+    g.position.set(x, r, z);
+    const tire = new THREE.CylinderGeometry(r, r, w, 16);
+    tire.rotateZ(Math.PI / 2);
+    const tm = new THREE.Mesh(tire, m.tire);
+    tm.castShadow = true;
+    g.add(tm);
+    const hub = new THREE.CylinderGeometry(r * 0.44, r * 0.44, w + 0.03, 12);
+    hub.rotateZ(Math.PI / 2);
+    const hm = new THREE.Mesh(hub, m.steel);
+    g.add(hm);
+    return g;
   }
 
   function cab(kit, m, opts) {
@@ -109,6 +114,7 @@
   function buildStockTruck(P) {
     const kit = new U.Kit();
     const m = materials(P);
+    const wheels = [];
     const LEN = 10.0, TZ = -1.55;
     chassis(kit, m, 12.4, 0);
     cab(kit, m, { z: 4.85, l: 2.6 });
@@ -136,52 +142,59 @@
     box(kit, m.red, 0.22, 0.1, 0.08, 0.9, 1.42, TZ - LEN / 2 - 0.1);
     box(kit, m.red, 0.22, 0.1, 0.08, -0.9, 1.42, TZ - LEN / 2 - 0.1);
     // 轮
-    wheel(kit, m, 1.18, 5.3, 0.56, 0.44);
-    wheel(kit, m, -1.18, 5.3, 0.56, 0.44);
-    wheel(kit, m, 1.18, -3.6, 0.56, 0.5);
-    wheel(kit, m, -1.18, -3.6, 0.56, 0.5);
-    wheel(kit, m, 1.18, -5.2, 0.56, 0.5);
-    wheel(kit, m, -1.18, -5.2, 0.56, 0.5);
-    return { kit: kit, m: m, len: 14.2, lightZ: 6.2, tailZ: -6.6, labelY: 6.0 };
+    wheels.push(wheel(m, 1.18, 5.3, 0.56, 0.44), wheel(m, -1.18, 5.3, 0.56, 0.44));
+    wheels.push(wheel(m, 1.18, -3.6, 0.56, 0.5), wheel(m, -1.18, -3.6, 0.56, 0.5));
+    wheels.push(wheel(m, 1.18, -5.2, 0.56, 0.5), wheel(m, -1.18, -5.2, 0.56, 0.5));
+    return { kit: kit, m: m, len: 14.2, lightZ: 6.2, tailZ: -6.6, labelY: 6.0, wheels: wheels };
   }
 
   /* 草料自卸车 */
   function buildForageTruck(P) {
     const kit = new U.Kit();
     const m = materials(P);
+    const wheels = [];
     const LEN = 9.2, TZ = -1.7;
+    const PY = 1.3, PZ = TZ - LEN / 2;      // 尾部铰点：卸料时斗体绕这里抬起
+    const by = (y) => y - PY, bz = (z) => z - PZ;
     chassis(kit, m, 12.0, 0);
     cab(kit, m, { z: 4.9, l: 2.45, h: 1.8 });
-    // 自卸斗
-    box(kit, m.paint, 2.5, 0.28, LEN, 0, 1.3, TZ);
-    for (const sx of [-1, 1]) box(kit, m.paint, 0.13, 1.35, LEN, sx * 1.19, 2.0, TZ);
-    box(kit, m.paint, 2.4, 1.35, 0.13, 0, 2.0, TZ + LEN / 2 - 0.06);
-    box(kit, m.dark, 2.4, 1.35, 0.13, 0, 2.0, TZ - LEN / 2 + 0.06);
-    box(kit, m.accent, 2.52, 0.12, LEN + 0.02, 0, 1.28, TZ);
+
+    // ---- 自卸斗（独立组，可抬起）----
+    const bedKit = new U.Kit();
+    box(bedKit, m.paint, 2.5, 0.28, LEN, 0, by(1.3), bz(TZ));
+    for (const sx of [-1, 1]) box(bedKit, m.paint, 0.13, 1.35, LEN, sx * 1.19, by(2.0), bz(TZ));
+    box(bedKit, m.paint, 2.4, 1.35, 0.13, 0, by(2.0), bz(TZ + LEN / 2 - 0.06));
+    box(bedKit, m.dark, 2.4, 1.35, 0.13, 0, by(2.0), bz(TZ - LEN / 2 + 0.06));
+    box(bedKit, m.accent, 2.52, 0.12, LEN + 0.02, 0, by(1.28), bz(TZ));
     // 草捆
     const hay = U.std({ color: 0xb89a55, roughness: 0.95, metalness: 0 });
     for (let i = 0; i < 5; i++) {
-      rbox(kit, hay, 2.02, 0.62, 1.5, 0.2, 0, 2.28, TZ - 3.2 + i * 1.6);
+      rbox(bedKit, hay, 2.02, 0.62, 1.5, 0.2, 0, by(2.28), bz(TZ - 3.2 + i * 1.6));
     }
     for (let i = 0; i < 4; i++) {
-      rbox(kit, hay, 2.0, 0.58, 1.45, 0.2, 0.05, 2.9, TZ - 2.4 + i * 1.6);
+      rbox(bedKit, hay, 2.0, 0.58, 1.45, 0.2, 0.05, by(2.9), bz(TZ - 2.4 + i * 1.6));
     }
-    // 篷布卷
+    const bed = new THREE.Group();
+    bed.position.set(0, PY, PZ);
+    bedKit.build(bed);
+    bed.traverse(function (o) { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+
+    // 篷布卷（不随斗升）
     tube(kit, m.tarp || U.std({ color: 0x2c3a33, roughness: 0.9 }), 0.26, 0.26, 2.2, 10, 0, 3.35, TZ + 3.9, 0, 0, Math.PI / 2);
+    // 液压顶（升斗时会被斗体挡住，保留静态柱体）
+    tube(kit, m.steel, 0.12, 0.12, 1.5, 8, 0, 1.05, TZ + 1.2, 0, 0, 0);
     // 轮
-    wheel(kit, m, 1.18, 5.25, 0.56, 0.44);
-    wheel(kit, m, -1.18, 5.25, 0.56, 0.44);
-    wheel(kit, m, 1.18, -3.4, 0.56, 0.5);
-    wheel(kit, m, -1.18, -3.4, 0.56, 0.5);
-    wheel(kit, m, 1.18, -4.9, 0.56, 0.5);
-    wheel(kit, m, -1.18, -4.9, 0.56, 0.5);
-    return { kit: kit, m: m, len: 13.8, lightZ: 6.2, tailZ: -6.3, labelY: 5.8 };
+    wheels.push(wheel(m, 1.18, 5.25, 0.56, 0.44), wheel(m, -1.18, 5.25, 0.56, 0.44));
+    wheels.push(wheel(m, 1.18, -3.4, 0.56, 0.5), wheel(m, -1.18, -3.4, 0.56, 0.5));
+    wheels.push(wheel(m, 1.18, -4.9, 0.56, 0.5), wheel(m, -1.18, -4.9, 0.56, 0.5));
+    return { kit: kit, m: m, len: 13.8, lightZ: 6.2, tailZ: -6.3, labelY: 5.8, wheels: wheels, bed: bed };
   }
 
   /* TMR 日粮车（拖拉机 + 卧式搅拌罐） */
   function buildTmrTruck(P) {
     const kit = new U.Kit();
     const m = materials(P);
+    const wheels = [];
     const mix = U.std({ color: 0xd9dcd4, roughness: 0.35, metalness: 0.55 });
     // 拖拉机底盘
     box(kit, m.dark, 1.5, 0.34, 8.6, 0, 1.0, 0);
@@ -233,12 +246,36 @@
     for (let i = 0; i < 4; i++) {
       box(kit, m.steel, 0.42, 0.05, 0.05, 0.1, 1.9 + i * 0.62, -5.15);
     }
+    // ---- 搅拌筒内的螺旋叶片（独立组，绕筒轴旋转 → 一眼看出在搅拌）----
+    const drumGrp = new THREE.Group();
+    drumGrp.position.set(0, 2.95, -2.4);
+    const bladeKit = new U.Kit();
+    for (let k = 0; k < 3; k++) {
+      const a = (k * Math.PI * 2) / 3;
+      const dir = new THREE.Vector3(Math.cos(a), Math.sin(a), 0);
+      const pos = new THREE.Vector3(0, 0, -2.0);
+      const g = new THREE.BoxGeometry(0.16, 0.16, 4.3);
+      // 沿筒轴方向贴一段斜叶片：绕轴取一段 30° 圆弧的薄片
+      const seg = new THREE.BoxGeometry(0.62, 0.1, 4.2);
+      seg.applyMatrix4(U.mat4(dir.x * 1.34, dir.y * 1.34, 0, 0, 0, a + Math.PI / 2));
+      bladeKit.add(seg, m.accent);
+      g.dispose();
+    }
+    bladeKit.build(drumGrp);
+    // 尾部出料门（投料时抬起）
+    const gate = new THREE.Group();
+    gate.position.set(0, 2.95, -4.9);
+    const gateKit = new U.Kit();
+    U.box(gateKit, m.steel, 1.5, 0.1, 1.05, 0, -0.5, -0.5);
+    U.box(gateKit, m.light, 1.55, 0.1, 0.12, 0, -0.52, -1.0);
+    gateKit.build(gate);
     // 轮
-    wheel(kit, m, 1.28, 6.1, 0.66, 0.5);
-    wheel(kit, m, -1.28, 6.1, 0.66, 0.5);
-    wheel(kit, m, 1.28, 3.1, 0.92, 0.62);
-    wheel(kit, m, -1.28, 3.1, 0.92, 0.62);
-    return { kit: kit, m: m, len: 13.0, lightZ: 7.5, tailZ: -5.0, labelY: 5.9 };
+    wheels.push(wheel(m, 1.28, 6.1, 0.66, 0.5), wheel(m, -1.28, 6.1, 0.66, 0.5));
+    wheels.push(wheel(m, 1.28, 3.1, 0.92, 0.62), wheel(m, -1.28, 3.1, 0.92, 0.62));
+    return {
+      kit: kit, m: m, len: 13.0, lightZ: 7.5, tailZ: -5.0, labelY: 5.9,
+      wheels: wheels, drum: drumGrp, gate: gate,
+    };
   }
 
   /* ============================================================
@@ -301,10 +338,24 @@
       const tl = buildTimeline(ways, path);
       const built = spec.build(spec.P);
       const group = new THREE.Group();
+      group.rotation.order = 'YXZ';
       built.kit.build(group);
       group.traverse(function (o) {
         if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; }
       });
+      // 可动的部件单独挂（车轮 / 自卸斗 / 搅拌叶片 / 出料门）
+      const spin = [];
+      for (let wi = 0; wi < (built.wheels || []).length; wi++) {
+        group.add(built.wheels[wi]);
+        spin.push(built.wheels[wi]);
+      }
+      if (built.bed) group.add(built.bed);
+      if (built.drum) group.add(built.drum);
+      if (built.gate) group.add(built.gate);
+      // 接触阴影（跟着车走，让车"压"在地上）
+      const aoQuad = U.aoPatch(3.7, built.len + 2.6, 0.42);
+      aoQuad.position.set(0, 0.014, 0);
+      group.add(aoQuad);
 
       // 头灯 / 尾灯 / 作业光 / 标签
       const headGlow = U.sprite(0xffd9a8, 5.4, 0.5);
@@ -378,6 +429,13 @@
         dwell: false,
         fade: 1,
         color: spec.color,
+        wheels: spin,
+        bed: built.bed || null,
+        drum: built.drum || null,
+        gate: built.gate || null,
+        roll: 0,
+        pitch: 0,
+        drumSpin: 0,
       };
       fleet.list.push(veh);
     }
@@ -566,6 +624,41 @@
         const blink = (Math.sin(time * 11.5) > 0.15) ? 1 : 0;
         v.blinkerL.material.opacity = (turn === 1 ? 0.95 : 0) * blink * f;
         v.blinkerR.material.opacity = (turn === -1 ? 0.95 : 0) * blink * f;
+
+        /* ---- 机械动作 ---- */
+        const sdt = dt > 0 ? Math.min(dt, 0.05) : 0;
+        // 车轮滚动
+        if (sdt > 0) {
+          const spin = (v.v * sdt) / 0.56;
+          for (let k = 0; k < v.wheels.length; k++) v.wheels[k].rotation.x += spin;
+        }
+        // 车身姿态：转弯侧倾 + 制动点头
+        const accel = sdt > 0 ? (v.v - v.vPrev) / sdt : 0;
+        if (sdt > 0) v.vPrev = v.v;
+        const wantRoll = turn ? -turn * Math.min(0.045, v.v * 0.004) : 0;
+        const wantPitch = Math.max(-0.045, Math.min(0.045, -accel * 0.010));
+        const kk = 1 - Math.exp(-sdt * 6);
+        v.roll += (wantRoll - v.roll) * kk;
+        v.pitch += (wantPitch - v.pitch) * kk;
+        v.group.rotation.z = v.roll;
+        v.group.rotation.x = v.pitch;
+        // TMR 搅拌筒：一直转，投料时更快
+        if (v.drum && sdt > 0) {
+          v.drumSpin += sdt * (v.dwell ? 2.1 : 1.15);
+          v.drum.rotation.z = v.drumSpin;
+        }
+        // 自卸斗：在青贮窖卸料时抬起
+        if (v.bed) {
+          const lbl = v.dwell && v.stops[v.si] ? String(v.stops[v.si].label || '') : '';
+          const want = /青贮/.test(lbl) ? -0.40 : 0;
+          v.bed.rotation.x += (want - v.bed.rotation.x) * (1 - Math.exp(-sdt * 1.8));
+        }
+        // TMR 尾部出料门：投料时抬起
+        if (v.gate) {
+          const lbl = v.dwell && v.stops[v.si] ? String(v.stops[v.si].label || '') : '';
+          const want = /投料|饲喂/.test(lbl) ? -0.95 : 0;
+          v.gate.rotation.x += (want - v.gate.rotation.x) * (1 - Math.exp(-sdt * 3));
+        }
       }
       fleet._stages = stages;
       return stages;

@@ -64,6 +64,9 @@
     const cHor = new THREE.Color();
     const cGlow = new THREE.Color();
     const cSun = new THREE.Color();
+    const cWhite = new THREE.Color(0xfff6ea);
+    const cGold = new THREE.Color(0xff9a45);
+    const dayKey = new THREE.Color();
     const azVec = new THREE.Vector3();
     const moonDirTmp = new THREE.Vector3();
 
@@ -107,8 +110,6 @@
           sky.stars.visible = nightF > 0.02;
         }
         if (sky.setSun) {
-          cSun.copy(blend(P.night.key, P.dusk.key, P.day.key, nightF, dayF));
-          sky.setSun(sunPos, cSun, 1.0 + duskF * 0.5, clamp01(1 - nightF) * 0.85 + duskF * 0.15);
           moonDirTmp.copy(moonPos).normalize();
           sky.setMoon(moonDirTmp, 1.0, nightF * 0.95);
         }
@@ -116,14 +117,22 @@
 
       /* ---- 主光：太阳 / 月亮 ---- */
       // 夜里把主光挪到月亮那边（位置过渡是平滑的，阴影方向会跟着转）
+      // 太阳色温与强度分开随高度角走：低角度偏金偏弱，正午偏白偏强
+      const hiF = smooth(0.10, 0.68, s);
+      dayKey.copy(cGold).lerp(cWhite, hiF);
+      const dayI = 2.3 + 3.9 * hiF;
+      if (sky && sky.setSun) {
+        cSun.copy(dayKey);
+        sky.setSun(sunPos, cSun, 1.0 + duskF * 0.5, clamp01(1 - nightF) * 0.85 + duskF * 0.15);
+      }
       key.position.copy(sunPos).lerp(moonPos, nightF);
-      key.color.copy(blend(P.night.key, P.dusk.key, P.day.key, nightF, dayF));
-      key.intensity = 6.4 * nightF + 2.4 * duskF + 3.9 * dayF;
+      key.color.copy(blend(P.night.key, P.dusk.key, dayKey, nightF, dayF));
+      key.intensity = 6.4 * nightF + (1 - nightF) * (dayI * dayF + 1.7 * duskF);
 
       /* ---- 环境光 / 暖补光 / 侧补光 ---- */
       hemi.color.copy(blend(P.night.sky, P.dusk.sky, P.day.sky, nightF, dayF));
       hemi.groundColor.copy(blend(P.night.ground, P.dusk.ground, P.day.ground, nightF, dayF));
-      hemi.intensity = 2.1 * nightF + 2.2 * duskF + 1.75 * dayF;
+      hemi.intensity = 2.1 * nightF + 2.2 * duskF + 2.05 * dayF;
       warm.color.copy(blend(P.night.warm, P.dusk.warm, P.day.warm, nightF, dayF));
       warm.intensity = 1.5 * nightF + 1.9 * duskF + 0.7 * dayF;
       fill.intensity = 1.3 * nightF + 1.0 * duskF + 0.55 * dayF;
@@ -145,7 +154,7 @@
         scene.fog.color.copy(blend(P.night.fog, P.dusk.fog, P.day.fog, nightF, dayF));
         scene.fog.density = 0.0016 * nightF + 0.0009 * duskF + 0.00045 * dayF;
       }
-      if (pipe && pipe.setExposure) pipe.setExposure(1.36 * nightF + 1.10 * duskF + 0.92 * dayF);
+      if (pipe && pipe.setExposure) pipe.setExposure(1.36 * nightF + 1.10 * duskF + 1.02 * dayF);
 
       // 供 UI 判断时段
       return { night: nightF, dusk: duskF, day: dayF };

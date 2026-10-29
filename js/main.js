@@ -28,6 +28,7 @@
   });
 
   const canvas = document.getElementById('scene');
+  const _tmpV = new THREE.Vector3();
   const veil = document.getElementById('veil');
 
   function fail(err) {
@@ -94,6 +95,7 @@
   }
 
   // 车辆物理是实时积分的：先按各车相位预热，定格截图时再快进到目标时刻
+  if (q.get('dbg')) document.title = 'piles=' + (world.feedPiles ? world.feedPiles.length : 'x') + ' y=' + (world.feedPiles && world.feedPiles[0] ? world.feedPiles[0].mesh.position.y.toFixed(2) + '/s' + world.feedPiles[0].mesh.scale.y.toFixed(2) : '-');
   fleet.seek(fixed != null ? fixed : 0);
 
   const size = new THREE.Vector2();
@@ -140,6 +142,33 @@
     }
 
     fleet.update(fixed != null ? 0 : dt);
+
+    // 料槽：TMR 刚喂过的舍最满，绕一圈回来前逐渐见底
+    if (tmrVeh && piles.length) {
+      const L = tmrVeh.path.length;
+      for (let i = 0; i < piles.length; i++) {
+        const p = piles[i];
+        let d = ((tmrVeh.s - p.sFeed) % L + L) % L;
+        const target = Math.max(0, Math.min(1, 1.06 - (d / L) * 1.45));
+        p.show = p.show < 0 ? target : p.show + (target - p.show) * Math.min(1, dt * 2.2);
+        p.mesh.scale.y = 0.62 + p.show * 0.5;
+      }
+    }
+
+    // 大门道闸：有车接近就抬杆
+    if (world.gateArm) {
+      const gp = world.gatePoint;
+      let near = 1e9;
+      for (let i = 0; i < fleet.list.length; i++) {
+        const v = fleet.list[i];
+        const d = Math.hypot(v.x - gp.x, v.z - gp.z);
+        if (d < near) near = d;
+      }
+      const want = near < 19 ? 1.28 : 0.0;
+      const cur = world.gateArm.rotation.x;
+      world.gateArm.rotation.x = cur + (want - cur) * Math.min(1, dt * 3.2);
+    }
+
     ui.update(hour, fleet.stageSet(), phase);
     rig.update(dt);
 
@@ -147,12 +176,32 @@
 
     if (q.get('dbg') && frames === 1) {
       document.title = 'h=' + hour.toFixed(2) +
-        ' f=' + (phase ? phase.night.toFixed(2) + '/' + phase.dusk.toFixed(2) + '/' + phase.day.toFixed(2) : 'null') +
-        ' key=' + world.lights.moon.intensity.toFixed(2) + ' hemi=' + world.lights.hemi.intensity.toFixed(2);
+        ' key=' + world.lights.moon.intensity.toFixed(2) + ' kc=' + world.lights.moon.color.getHexString() +
+        ' hemi=' + world.lights.hemi.intensity.toFixed(2) +
+        ' piles=' + piles.length + ' s=' + (piles[0] ? piles[0].show.toFixed(2) + '/' + piles[0].mesh.scale.y.toFixed(2) : '-');
     }
     if (frames === 1) ui.reveal();
     frames++;
     root.requestAnimationFrame(frame);
+  }
+
+  /* 料槽日粮：按 TMR 车在路线上"路过该舍"的位置算存量（越晚喂到越空） */
+  const piles = world.feedPiles || [];
+  let tmrVeh = null;
+  for (let i = 0; i < fleet.list.length; i++) if (fleet.list[i].id === 'tmr') tmrVeh = fleet.list[i];
+  if (tmrVeh && piles.length) {
+    const pth = tmrVeh.path;
+    const N = 1400;
+    for (const p of piles) {
+      let best = 1e9, bestS = 0;
+      for (let k = 0; k < N; k++) {
+        const sv = (k / N) * pth.length;
+        pth.pointAt(sv, _tmpV);
+        const d = Math.hypot(_tmpV.x - p.x, _tmpV.z - p.z);
+        if (d < best) { best = d; bestS = sv; }
+      }
+      p.sFeed = bestS;
+    }
   }
 
   root.requestAnimationFrame(frame);

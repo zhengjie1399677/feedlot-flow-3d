@@ -142,7 +142,7 @@
     M.wallCool = S({ map: T.concrete, color: 0x9aa6a8, roughness: 0.9 });
     M.wallDark = S({ map: T.corrugated, color: 0x899da4, roughness: 0.6, metalness: 0.3 });
     M.roof = S({ map: T.roof, color: 0xb06c48, roughness: 0.6, metalness: 0.22 });
-    M.roofPlant = S({ map: T.roof, color: 0x94a6ad, roughness: 0.45, metalness: 0.5 });
+    M.roofPlant = S({ map: T.roof, color: 0x9fb3bb, roughness: 0.5, metalness: 0.35 });
     M.timber = S({ color: 0x54402f, roughness: 0.85 });
     M.timberLight = S({ color: 0x8a6a4a, roughness: 0.85 });
     M.steel = S({ color: 0x38424a, roughness: 0.42, metalness: 0.75 });
@@ -151,6 +151,7 @@
     M.glass = S({ color: 0x0c161d, roughness: 0.07, metalness: 0.9 });
     M.concreteTrough = S({ color: 0x8f918a, roughness: 0.95 });
     M.feed = S({ color: 0x6c5029, roughness: 1 });
+    M.feedPile = S({ map: T.grass, color: 0xb7a463, roughness: 1 });
     M.silage = S({ color: 0x59612c, roughness: 1 });
     M.tarp = S({ map: T.tarp, color: 0xb2ad9a, roughness: 0.85 });
     M.film = S({ map: T.tarp, color: 0xd9d7cd, roughness: 0.55 });
@@ -593,6 +594,7 @@
   /* ---------------- 入口 ---------------- */
   FL.buildWorld = function (scene) {
     const world = {
+    feedPiles: [],
       group: new THREE.Group(),
       flows: [],
       labels: [],
