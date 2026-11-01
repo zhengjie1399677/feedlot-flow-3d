@@ -1,11 +1,10 @@
+import * as THREE from 'three';
+import { FL } from './fl.js';
+
 /* ============================================================
  *  utils.js — 程序化材质 / 圆角几何 / 合并 / 路径 / 小工具
  *  依赖全局 THREE（r159 UMD）
  * ============================================================ */
-(function (root) {
-  'use strict';
-  const THREE = root.THREE;
-  const FL = (root.FL = root.FL || {});
   const U = (FL.U = {});
 
   /* ---------------- 数学 ---------------- */
@@ -656,5 +655,3 @@
       t += s;
     }
   };
-
-})(window);

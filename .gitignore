@@ -3,3 +3,16 @@ tools/*.png
 tools/*.bak.js
 tools/_*
 tools/server.log
+tools/vite.log
+tools/dist-server.log
+
+# 对照图组：本地生成，不进版本库
+tools/base/
+tools/base-http/
+tools/vite-r*/
+tools/dist-*/
+tools/diffs-*/
+
+node_modules/
+dist/
+legacy.html

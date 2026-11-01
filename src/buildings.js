@@ -1,10 +1,9 @@
+import * as THREE from 'three';
+import { FL } from './fl.js';
+
 /* ============================================================
  *  buildings.js — 牛舍 / 地磅 / 大门 / 综合楼 / TMR 配料 / 装车区
  * ============================================================ */
-(function (root) {
-  'use strict';
-  const THREE = root.THREE;
-  const FL = root.FL;
   const U = FL.U;
   const L = FL.LAYOUT;
 
@@ -1395,5 +1394,3 @@
       world.pools.push({ x: b.cx, z: b.cz + 11, size: 14, warm: 0.35 });
     }
   };
-
-})(window);

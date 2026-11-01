@@ -1,11 +1,20 @@
+import * as THREE from 'three';
+import { FL } from './fl.js';
+import './utils.js';
+import './layout.js';
+import './world.js';
+import './buildings.js';
+import './cows.js';
+import './vehicles.js';
+import './effects.js';
+import './daycycle.js';
+import './ui.js';
+
+function boot() {
 /* ============================================================
  *  main.js — 装配、循环、自适应
  *  URL 参数：?t=20 定格在第 20 秒（截图用）；?fx=0 关泛光；?ui=0 隐藏界面
  * ============================================================ */
-(function (root) {
-  'use strict';
-  const THREE = root.THREE;
-  const FL = root.FL;
   const U = FL.U;
 
   const q = new URLSearchParams(location.search);
@@ -25,7 +34,7 @@
   }
 
   // 运行期错误落到标题里，便于无头截图排查
-  root.addEventListener('error', function (e) {
+  window.addEventListener('error', function (e) {
     document.title = 'ERR ' + (e.message || '') + ' @' + String(e.filename || '').split('/').pop() + ':' + e.lineno;
   });
 
@@ -63,10 +72,10 @@
     return;
   }
 
-  renderer.setPixelRatio(Math.min(root.devicePixelRatio || 1, 1.6));
-  renderer.setSize(root.innerWidth, root.innerHeight, false);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.6));
+  renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.shadowMap.enabled = q.get('sh') !== '0';
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = fxOn ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
@@ -74,7 +83,7 @@
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x04070a);
 
-  const camera = new THREE.PerspectiveCamera(36, root.innerWidth / Math.max(1, root.innerHeight), 4, 3400);
+  const camera = new THREE.PerspectiveCamera(36, window.innerWidth / Math.max(1, window.innerHeight), 4, 3400);
 
   let world, fleet, rig, pipe, ui, sky, day, herd;
   let cutUpdate = null;   // 幽灵屋顶的每帧插值（在 try 块里赋值，frame 在外面用）
@@ -92,7 +101,13 @@
     if (pan.length === 2 && isFinite(pan[0]) && isFinite(pan[1])) rig.panTo(pan[0], pan[1], true);
     pipe = FL.createPipeline(renderer, { enabled: fxOn });
     day = FL.createDay(scene, world, sky, pipe);
-    ui = uiOn ? FL.createUI(fleet, rig) : { update: function () {}, reveal: function () {}, setCutaway: function () {}, onCutaway: function () {} };
+    // ui=0（纯画面对照图）时也要撤掉加载遮罩，否则永远停在 LOADING FEEDLOT
+    const revealVeil = function () {
+      document.body.classList.add('ready');
+      const v = document.getElementById('veil');
+      if (v) v.classList.add('gone');
+    };
+    ui = uiOn ? FL.createUI(fleet, rig) : { update: function () {}, reveal: revealVeil, setCutaway: function () {}, onCutaway: function () {} };
     // 剖视 = 幽灵屋顶：屋顶不消失，而是淡成半透明，既保住体量又能看见舍内
     // 屋顶材质和其他建筑共用，先克隆一份专用，避免整场跟着变透明
     const roofMats = [];
@@ -147,16 +162,16 @@
 
   const size = new THREE.Vector2();
   function resize() {
-    const w = Math.max(1, root.innerWidth);
-    const h = Math.max(1, root.innerHeight);
-    renderer.setPixelRatio(Math.min(root.devicePixelRatio || 1, 1.6));
+    const w = Math.max(1, window.innerWidth);
+    const h = Math.max(1, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.6));
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     renderer.getDrawingBufferSize(size);
     pipe.setSize(size.x, size.y);
   }
-  root.addEventListener('resize', resize);
+  window.addEventListener('resize', resize);
   resize();
 
   for (const pl of world.pointLights) pl.userData.base = pl.intensity;
@@ -232,7 +247,7 @@
     }
     if (frames === 1) ui.reveal();
     frames++;
-    root.requestAnimationFrame(frame);
+    window.requestAnimationFrame(frame);
   }
 
   /* 料槽日粮：按 TMR 车在路线上"路过该舍"的位置算存量（越晚喂到越空） */
@@ -254,7 +269,9 @@
     }
   }
 
-  root.requestAnimationFrame(frame);
+  window.requestAnimationFrame(frame);
 
-  root.FL_APP = { scene: scene, camera: camera, renderer: renderer, world: world, fleet: fleet, rig: rig, day: day };
-})(window);
+  window.FL_APP = { scene: scene, camera: camera, renderer: renderer, world: world, fleet: fleet, rig: rig, day: day };
+}
+
+boot();

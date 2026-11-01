@@ -1,10 +1,9 @@
+import * as THREE from 'three';
+import { FL } from './fl.js';
+
 /* ============================================================
  *  world.js — 场地、路网、围栏、灯杆、树木、标签、灯光
  * ============================================================ */
-(function (root) {
-  'use strict';
-  const THREE = root.THREE;
-  const FL = root.FL;
   const U = FL.U;
   const L = FL.LAYOUT;
 
@@ -694,4 +693,3 @@
   };
 
   FL.spinWheel = null;
-})(window);

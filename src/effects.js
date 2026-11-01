@@ -1,10 +1,9 @@
+import * as THREE from 'three';
+import { FL } from './fl.js';
+
 /* ============================================================
  *  effects.js — 环境光照 / 天空 / 相机 / 泛光后处理
  * ============================================================ */
-(function (root) {
-  'use strict';
-  const THREE = root.THREE;
-  const FL = root.FL;
   const U = FL.U;
   const L = FL.LAYOUT;
 
@@ -570,5 +569,3 @@
     };
     return api;
   };
-
-})(window);

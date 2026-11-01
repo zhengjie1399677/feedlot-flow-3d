@@ -1,10 +1,12 @@
+import * as THREE from 'three';
+import { FL } from './fl.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
+
 /* 牛群：polyfork.dev "Cow base"（CC0）。
-   - 走 http 时：GLTFLoader 载入 vendor/models/cow_polyfork.glb，SkeletonUtils 克隆，
-     每头一个 AnimationMixer —— 站着的播 Idle，走动的播 Walk 并在舍内/栏圈里移动。
-   - file:// 打开或加载失败时：退回 js/cow-asset.js 里预烘的 6 帧顶点（会呼吸，但不走动）。 */
-(function (root) {
-  const FL = root.FL = root.FL || {};
-  const MODEL = 'vendor/models/cow_polyfork.glb';
+   GLTFLoader 载入 public/models/cow_polyfork.glb，SkeletonUtils 克隆，
+   每头一个 AnimationMixer —— 站着的播 Idle，走动的播 Walk 并在舍内/栏圈里移动。 */
+  const MODEL = 'models/cow_polyfork.glb';
   const YAW_FIX = 0;          // 若发现牛倒着走，这里补 Math.PI
 
   function bytes(buf, off, n) { return buf.slice(off, off + n); }
@@ -45,7 +47,6 @@
     scene.add(group);
     if (!spots || !spots.length) return group;
 
-    let baked = null;
     const mixers = [];
     const walkers = [];
     let lastT = 0;
@@ -92,11 +93,10 @@
           holder.add(inst);
         }
         group.add(holder);
-        if (baked) baked.group.visible = false;
         group.userData.mode = 'skinned';
         document.body.dataset.herd = 'skinned';
       }, undefined, function (e) {
-        console.warn('牛模型加载失败，退回烘焙版本', e);
+        console.warn('牛模型加载失败', e);
       });
     }
 
@@ -143,113 +143,17 @@
       }
     }
 
-    /* ---------- 方案 B：预烘 6 帧 ---------- */
-    function buildBaked() {
-      const A = root.FL_COW;
-      if (!A) return null;
-      const bin = atob(A.bin);
-      const raw = new Uint8Array(bin.length);
-      for (let i = 0; i < bin.length; i++) raw[i] = bin.charCodeAt(i);
-      const buf = raw.buffer;
-
-      const colorAttr = new THREE.BufferAttribute(new Float32Array(bytes(buf, A.oC, A.v * 12)), 3);
-      {
-        const c = new THREE.Color();
-        const brown = new THREE.Color(0.050, 0.020, 0.009);
-        const cream = new THREE.Color(0.320, 0.140, 0.050);
-        for (let i = 0; i < A.v; i++) {
-          c.fromBufferAttribute(colorAttr, i);
-          remapColor(c, brown, cream);
-          colorAttr.setXYZ(i, c.r, c.g, c.b);
-        }
-      }
-      const indexAttr = new THREE.BufferAttribute(new Uint32Array(bytes(buf, A.oI, A.ic * 4)), 1);
-      const mat = new THREE.MeshStandardMaterial({
-        roughness: 0.92, metalness: 0.02, side: THREE.DoubleSide, vertexColors: true,
-      });
-
-      const g0 = new THREE.Group();
-      const frames = [];
-      for (let f = 0; f < A.nf; f++) {
-        const g = new THREE.BufferGeometry();
-        g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(bytes(buf, A.oF[f], A.v * 12)), 3));
-        g.setAttribute('color', colorAttr);
-        g.setIndex(indexAttr);
-        g.computeVertexNormals();
-        g.computeBoundingSphere();
-        const inst = new THREE.InstancedMesh(g, mat, spots.length);
-        inst.castShadow = true;
-        inst.receiveShadow = true;
-        inst.count = 0;
-        inst.frustumCulled = false;
-        g0.add(inst);
-        frames.push(inst);
-      }
-
-      const m4 = new THREE.Matrix4();
-      const q = new THREE.Quaternion();
-      const up = new THREE.Vector3(0, 1, 0);
-      const pos = new THREE.Vector3();
-      const scl = new THREE.Vector3();
-      for (let i = 0; i < spots.length; i++) {
-        const s = spots[i];
-        const k = (s.scale || 1) * 0.92;
-        scl.set(k, k, k);
-        q.setFromAxisAngle(up, s.rot || 0);
-        pos.set(s.x, s.y || 0.22, s.z);
-        m4.compose(pos, q, scl);
-        s.mat = m4.clone();
-        s.phase = (i * 0.37) % 1;
-        s.speed = 0.9 + ((i * 29) % 100) / 260;
-      }
-      const cursor = new Int32Array(A.nf);
-      return {
-        group: g0,
-        update: function (time) {
-          cursor.fill(0);
-          for (let i = 0; i < spots.length; i++) {
-            const s = spots[i];
-            const ph = ((time * s.speed * 0.16) + s.phase) % 1;
-            const f = Math.min(A.nf - 1, Math.floor(ph * A.nf));
-            const inst = frames[f];
-            const n = cursor[f];
-            inst.setMatrixAt(n, s.mat);
-            cursor[f] = n + 1;
-          }
-          for (let f = 0; f < A.nf; f++) {
-            frames[f].count = cursor[f];
-            frames[f].instanceMatrix.needsUpdate = true;
-          }
-        },
-      };
-    }
-
-    baked = buildBaked();
-    if (baked) group.add(baked.group);
-    group.userData.mode = baked ? 'baked' : 'none';
-
     group.userData.update = function (time) {
       const dt = lastT ? Math.min(0.06, Math.max(0, time - lastT)) : 0.016;
       lastT = time;
-      if (baked && baked.group.visible) baked.update(time);
       if (mixers.length) {
         if (walkers.length) stepWalkers(dt);
         for (let i = 0; i < mixers.length; i++) mixers[i].update(dt);
       }
     };
 
-    // 等 GLTFLoader 就绪（module 脚本延迟执行），再走真·蒙皮那条路
-    if (location.protocol !== 'file:') {
-      let waited = 0;
-      (function poll() {
-        if (root.FL_GLTF) {
-          buildRuntime(new root.FL_GLTF.GLTFLoader(), root.FL_GLTF.cloneSkinned);
-          return;
-        }
-        waited += 120;
-        if (waited < 6000) setTimeout(poll, 120);
-      })();
-    }
+    // 真·蒙皮牛：GLTFLoader / SkeletonUtils 已经是静态 ESM 导入，直接就绪
+    buildRuntime(new GLTFLoader(), cloneSkinned);
 
     return group;
   };
@@ -311,4 +215,3 @@
     }
     return out;
   };
-})(window);

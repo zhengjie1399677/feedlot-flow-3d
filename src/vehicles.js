@@ -1,10 +1,9 @@
+import * as THREE from 'three';
+import { FL } from './fl.js';
+
 /* ============================================================
  *  vehicles.js — 车辆造型 / 路线运行 / 作业停顿
  * ============================================================ */
-(function (root) {
-  'use strict';
-  const THREE = root.THREE;
-  const FL = root.FL;
   const U = FL.U;
   const L = FL.LAYOUT;
 
@@ -688,5 +687,3 @@
     fleet.vehicles = fleet.list;
     return fleet;
   };
-
-})(window);

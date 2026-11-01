@@ -1,10 +1,9 @@
+import { FL } from './fl.js';
+
 /* ============================================================
  *  layout.js — 场地坐标 / 路网 / 车辆路线 / 视角
  *  单位：米。相机从东南（+x +z）看向西北，所以画面左＝西，右＝东。
  * ============================================================ */
-(function (root) {
-  'use strict';
-  const FL = (root.FL = root.FL || {});
 
   const L = (FL.LAYOUT = {
     plot: { x0: -127, x1: 127, z0: -99, z1: 95 },
@@ -280,5 +279,3 @@
 
   L.barnFront = (b) => b.cz + b.dep / 2;
   L.barnBack = (b) => b.cz - b.dep / 2;
-
-})(window);

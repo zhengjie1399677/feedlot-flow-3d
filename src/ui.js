@@ -1,9 +1,8 @@
+import { FL } from './fl.js';
+
 /* ============================================================
  *  ui.js — 2D 界面：图例 / 视角 / 流程条 / 时钟
  * ============================================================ */
-(function (root) {
-  'use strict';
-  const FL = root.FL;
   const L = FL.LAYOUT;
 
   const hex = (c) => '#' + ('000000' + c.toString(16)).slice(-6);
@@ -79,7 +78,7 @@
     }
     cutBtn.addEventListener('click', function () { applyCut(!cutState.on); });
     viewsEl.appendChild(cutBtn);
-    root.addEventListener('keydown', function (e) {
+    window.addEventListener('keydown', function (e) {
       if (e.key === 'r' || e.key === 'R') applyCut(!cutState.on);
     });
 
@@ -150,5 +149,3 @@
 
     return api;
   };
-
-})(window);

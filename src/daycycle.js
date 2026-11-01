@@ -1,11 +1,10 @@
+import * as THREE from 'three';
+import { FL } from './fl.js';
+
 /* =========================================================
  *  昼夜循环 —— 天光、月亮、场灯、雾、曝光随时刻一起变
  *  由 main.js 每帧喂一个 0..24 的小时数进来
  * ========================================================= */
-(function (window) {
-  'use strict';
-  const THREE = window.THREE;
-  const FL = (window.FL = window.FL || {});
 
   const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
   const smooth = (a, b, x) => {
@@ -162,4 +161,3 @@
 
     return { setHour: setHour };
   };
-})(window);
