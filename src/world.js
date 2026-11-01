@@ -180,6 +180,8 @@ import { FL } from './fl.js';
     M.steelLight = S({ color: 0xa7b5bd, roughness: 0.3, metalness: 0.85 });
     M.galv = PBR('CorrugatedSteel009', 0xa8b2b6, 0.42, 0.62, 1.8);
     M.glass = S({ color: 0x0c161d, roughness: 0.07, metalness: 0.9 });
+    // 大面积玻璃幕墙：纯镜面在没有强环境光时整片发黑，单独给一个带底色的版本
+    M.curtain = S({ color: 0x5a6b78, roughness: 0.34, metalness: 0.06, envMapIntensity: 2.0 });
     M.concreteTrough = S({ color: 0x8f918a, roughness: 0.95 });
     M.feed = S({ color: 0x6c5029, roughness: 1 });
     M.feedPile = S({ map: T.grass, color: 0xb7a463, roughness: 1 });
