@@ -28,7 +28,17 @@ import { FL } from './fl.js';
   function flatRound(kit, mat, w, d, x, z, y, r, uvTile) {
     const g = new THREE.ShapeGeometry(roundedRectShape(w, d, r), 10);
     const uv = g.getAttribute('uv');
-    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / uvTile, uv.getY(i) / uvTile);
+    if (!uvTile) {
+      // uvTile 省略 = 整张图只铺一次（大块地面用，避免看出平铺接缝）
+      g.computeBoundingBox();
+      const bb = g.boundingBox;
+      const sx = Math.max(1e-6, bb.max.x - bb.min.x), sy = Math.max(1e-6, bb.max.y - bb.min.y);
+      for (let i = 0; i < uv.count; i++) {
+        uv.setXY(i, (uv.getX(i) - bb.min.x) / sx, (uv.getY(i) - bb.min.y) / sy);
+      }
+    } else {
+      for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / uvTile, uv.getY(i) / uvTile);
+    }
     g.rotateX(-Math.PI / 2);
     g.translate(x, y, z);
     kit.add(g, mat);
@@ -129,6 +139,7 @@ import { FL } from './fl.js';
     M.soil = S({ color: 0x1b1d18, roughness: 1 });
     M.plinth = S({ color: 0x0d100e, roughness: 1 });
     M.grass = S({ map: T.grass, color: 0xb4c296, roughness: 1 });
+    M.lawn = S({ map: T.lawn, color: 0xa8b184, roughness: 1 });
     M.apron = S({ map: T.concrete, color: 0xa3a8aa, roughness: 0.92, metalness: 0.02 });
     M.apronEdge = S({ map: T.concreteDark, color: 0x6d7376, roughness: 0.95 });
     M.asphalt = S({ map: T.asphalt, color: 0x9fa8ad, roughness: 0.95, metalness: 0.02 });
@@ -199,7 +210,7 @@ import { FL } from './fl.js';
     U.box(kit, M.soil, L.slab.w, 9, L.slab.d, 0, -4.6, cz, 0, 0, 0, 5);
     U.box(kit, M.plinth, L.slab.w + 5, 1.6, L.slab.d + 5, 0, -9.6, cz, 0, 0, 0, 6);
     // 草皮
-    flatRound(kit, M.grass, 252, 192, 0, cz, 0.04, 6, 10);
+    flatRound(kit, M.lawn, 252, 192, 0, cz, 0.04, 6, 0);
     // 场地
     flatRound(kit, M.apronEdge, 232, 168, 0, -4, 0.16, 13, 12);
     flatRound(kit, M.apron, 228, 164, 0, -4, 0.2, 12, 12);

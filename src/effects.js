@@ -8,42 +8,79 @@ import { FL } from './fl.js';
   const L = FL.LAYOUT;
 
   /* ---------------- 环境贴图 ---------------- */
+  // 环境图必须跟着昼夜走。原来是启动时烘一次"夜景"就不管了，于是正午的金属、
+  // 玻璃里反射的全是夜空。现在按当前天光颜色现烘，颜色变化超过阈值才重烘一次
+  // （整轮昼夜约 20 次，PMREM 在 256×128 上只有几毫秒）。
   FL.createEnvironment = function (scene, renderer) {
     const pmrem = new THREE.PMREMGenerator(renderer);
     pmrem.compileEquirectangularShader();
-    const w = 512, h = 256;
+    const w = 256, h = 128;
     const cv = document.createElement('canvas');
     cv.width = w; cv.height = h;
     const ctx = cv.getContext('2d');
-    const g = ctx.createLinearGradient(0, 0, 0, h);
-    g.addColorStop(0.0, '#0a1424');
-    g.addColorStop(0.32, '#12202f');
-    g.addColorStop(0.50, '#3a3226');
-    g.addColorStop(0.56, '#241d16');
-    g.addColorStop(1.0, '#04060a');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, w, h);
-    // 月亮方向的一团冷光
-    const rg = ctx.createRadialGradient(w * 0.2, h * 0.3, 0, w * 0.2, h * 0.3, w * 0.16);
-    rg.addColorStop(0, 'rgba(190,215,255,0.9)');
-    rg.addColorStop(0.4, 'rgba(120,160,210,0.25)');
-    rg.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = rg;
-    ctx.fillRect(0, 0, w, h);
-    // 地平线暖带
-    const wg = ctx.createLinearGradient(0, h * 0.46, 0, h * 0.56);
-    wg.addColorStop(0, 'rgba(255,150,70,0)');
-    wg.addColorStop(0.5, 'rgba(255,150,70,0.28)');
-    wg.addColorStop(1, 'rgba(255,150,70,0)');
-    ctx.fillStyle = wg;
-    ctx.fillRect(0, h * 0.46, w, h * 0.1);
     const tex = new THREE.CanvasTexture(cv);
     tex.mapping = THREE.EquirectangularReflectionMapping;
     tex.colorSpace = THREE.SRGBColorSpace;
-    const rt = pmrem.fromEquirectangular(tex);
-    scene.environment = rt.texture;
-    tex.dispose();
-    pmrem.dispose();
+    let rt = null;
+    const last = { r: -9, g: -9, b: -9, sun: new THREE.Vector2(0, 0) };
+
+    function paint(top, mid, hor, glow, sunDir) {
+      ctx.clearRect(0, 0, w, h);
+      const g = ctx.createLinearGradient(0, 0, 0, h);
+      g.addColorStop(0.0, '#' + top.getHexString());
+      g.addColorStop(0.34, '#' + mid.getHexString());
+      g.addColorStop(0.49, '#' + hor.getHexString());
+      g.addColorStop(0.56, '#' + hor.clone().multiplyScalar(0.45).getHexString());
+      g.addColorStop(1.0, '#0b0d0b');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, w, h);
+      // 太阳方位的一团光：决定高光往哪边甩
+      if (sunDir) {
+        const sx = ((Math.atan2(sunDir.x, sunDir.z) / (Math.PI * 2)) + 0.5) * w;
+        const sy = h * 0.44;
+        const rg = ctx.createRadialGradient(sx, sy, 0, sx, sy, w * 0.22);
+        rg.addColorStop(0, 'rgba(' + [
+          Math.round(255 * Math.min(1, glow.r * 1.6 + 0.15)),
+          Math.round(255 * Math.min(1, glow.g * 1.6 + 0.12)),
+          Math.round(255 * Math.min(1, glow.b * 1.6 + 0.10)),
+        ].join(',') + ',0.95)');
+        rg.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = rg;
+        ctx.fillRect(0, 0, w, h);
+        // 对侧再补一团弱光，避免球面另一侧全黑成一块
+        const bx = (sx + w / 2) % w;
+        const bg = ctx.createRadialGradient(bx, h * 0.5, 0, bx, h * 0.5, w * 0.3);
+        bg.addColorStop(0, 'rgba(120,140,170,0.22)');
+        bg.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = bg;
+        ctx.fillRect(0, 0, w, h);
+      }
+      tex.needsUpdate = true;
+    }
+
+    function rebuild(top, mid, hor, glow, sunDir) {
+      paint(top, mid, hor, glow, sunDir);
+      const next = pmrem.fromEquirectangular(tex);
+      scene.environment = next.texture;
+      if (rt) rt.dispose();
+      rt = next;
+    }
+
+    // 先用一套中性天光占位，等 daycycle 第一次 setHour 就会按真实时刻重烘
+    rebuild(new THREE.Color(0.16, 0.21, 0.30), new THREE.Color(0.42, 0.47, 0.55),
+      new THREE.Color(0.72, 0.68, 0.60), new THREE.Color(1.0, 0.72, 0.42), null);
+
+    return {
+      update: function (top, mid, hor, glow, sunDir) {
+        if (!top) return;
+        const dr = Math.abs(top.r - last.r) + Math.abs(mid.g - last.g) + Math.abs(hor.b - last.b);
+        const sunMoved = sunDir ? Math.hypot(sunDir.x - last.sun.x, sunDir.z - last.sun.y) : 0;
+        if (dr < 0.05 && sunMoved < 0.06) return;
+        last.r = top.r; last.g = mid.g; last.b = hor.b;
+        if (sunDir) { last.sun.x = sunDir.x; last.sun.y = sunDir.z; }
+        rebuild(top, mid, hor, glow, sunDir);
+      },
+    };
   };
 
   /* ---------------- 天空 / 星空 / 灯柱 ---------------- */
@@ -474,6 +511,7 @@ import { FL } from './fl.js';
         place();
       },
       get zoom() { return base / state.dist; },
+      get dist() { return state.dist; },
     };
     const PAN_KEYS = { arrowleft: 'l', a: 'l', arrowright: 'r', d: 'r', arrowup: 'u', w: 'u', arrowdown: 'd', s: 'd' };
     window.addEventListener('keydown', (e) => {

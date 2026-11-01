@@ -89,7 +89,7 @@ function boot() {
   let world, fleet, rig, pipe, ui, sky, day, herd;
   let cutUpdate = null;   // 幽灵屋顶的每帧插值（在 try 块里赋值，frame 在外面用）
   try {
-    FL.createEnvironment(scene, renderer);
+    FL.env = FL.createEnvironment(scene, renderer);
     world = FL.buildWorld(scene);
     if (FL.createTerrain) FL.createTerrain(scene, world);
     sky = FL.createSky(scene, world);
@@ -200,6 +200,14 @@ function boot() {
 
     const hour = hourAt(simTime);
     const phase = day.setHour(hour);
+    // 雾只该吃掉远景。three 的雾按相机深度算，镜头一拉远场地自己就落在雾里，
+    // 所以把雾的起点按相机距离推到场地之外，远端长度保持各时段的设定值。
+    if (scene.fog && phase && phase.fogSpan) {
+      const camDist = rig.dist || 336;
+      scene.fog.near = Math.max(scene.fog.near, camDist + 240);
+      scene.fog.far = scene.fog.near + phase.fogSpan;
+      if (sky && sky.setLand) sky.setLand(scene.fog.color);
+    }
     if (sky && sky.update) sky.update(fixed != null ? 0 : dt);
     for (let i = 0; i < world.pointLights.length; i++) {
       const pl = world.pointLights[i];
@@ -242,6 +250,20 @@ function boot() {
     pipe.render(scene, camera, simTime);
 
     if (q.get('dbg') && frames === 1) {
+      const hits = [];
+      for (let i = 0; i < fleet.list.length; i++) {
+        for (let k = i + 1; k < fleet.list.length; k++) {
+          const A = fleet.list[i], B = fleet.list[k];
+          const dx = B.x - A.x, dz = B.z - A.z;
+          const gap = Math.hypot(dx, dz) - (A.len + B.len) * 0.5;
+          if (gap < 1.2) {
+            hits.push(A.id + '(' + A.x.toFixed(1) + ',' + A.z.toFixed(1) + ' v' + A.v.toFixed(1) + ' L' + A.len.toFixed(1) + ')' +
+              '~' + B.id + '(' + B.x.toFixed(1) + ',' + B.z.toFixed(1) + ' v' + B.v.toFixed(1) + ' L' + B.len.toFixed(1) + ')' +
+              ' gap=' + gap.toFixed(1));
+          }
+        }
+      }
+      document.body.dataset.overlap = hits.length ? hits.join(' | ') : 'none';
       document.title = 'h=' + hour.toFixed(2) +
         ' key=' + world.lights.moon.intensity.toFixed(2) + ' kc=' + world.lights.moon.color.getHexString() +
         ' hemi=' + world.lights.hemi.intensity.toFixed(2) +

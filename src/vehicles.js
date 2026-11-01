@@ -454,13 +454,24 @@ import { FL } from './fl.js';
         const o = fleet.list[i];
         if (o === v) continue;
         const dx = o.x - v.x, dz = o.z - v.z;
+        const dist = Math.hypot(dx, dz);
+        if (dist < 1e-3) continue;
         const ahead = dx * v.hx + dz * v.hz;
-        if (ahead <= 0 || ahead > SCAN) continue;
-        const lat = Math.abs(dz * v.hx - dx * v.hz);
-        if (lat > LANE) continue;
-        const clear = ahead - (v.len + o.len) * 0.5 - FOLLOW;
-        const allow = clear <= 0 ? 0 : Math.min(1, clear / 13) * v.vmax;
-        if (allow < best) best = allow;
+        if (ahead <= 0) continue;
+        // 1) 同车道跟车：留净空（侧向容差内才算是"前车"）
+        if (ahead <= SCAN) {
+          const lat = Math.abs(dz * v.hx - dx * v.hz);
+          if (lat <= LANE) {
+            const clear = ahead - (v.len + o.len) * 0.5 - FOLLOW;
+            const allow = clear <= 0 ? 0 : Math.min(1, clear / 13) * v.vmax;
+            if (allow < best) best = allow;
+          }
+        }
+        // 2) 斜切与路口：两条路线在这里交汇时，横向距离会被角度放大，
+        //    只靠车道容差看不见对方，于是两车会直接插到一起。这条按距离兜底。
+        // 留出制动距离：10 m/s + DEC 3.3 需要约 16 m，再加车身长度
+        const reach = Math.max(SCAN, (v.len + o.len) * 0.5 + FOLLOW + 20);
+        if (dist < reach && ahead > 0.55 * dist && best > 0) best = 0;
       }
       return best;
     }

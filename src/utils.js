@@ -308,12 +308,69 @@ import { FL } from './fl.js';
     T.concrete = makeTexture(concrete(), { repeat: [1, 1] });
     T.concreteDark = makeTexture(concreteDark(), { repeat: [1, 1] });
     T.grass = makeTexture(grass(), { repeat: [8, 8] });
+    T.lawn = makeTexture(lawn(), { repeat: [1, 1] });
     T.corrugated = makeTexture(corrugated(), { repeat: [1, 1] });
     T.roof = makeTexture(roofMetal(), { repeat: [1, 1] });
     T.tarp = makeTexture(tarp(), { repeat: [1, 1] });
     T.ready = true;
     return T;
   };
+
+  /* 场内草坪：整块 252×192 m 只铺一次（不平铺），所以看不到"布块"接缝 */
+  function lawn() {
+    const S = 1024;
+    const c = makeCanvas(S);
+    const ctx = c.getContext('2d');
+    const rand = U.rng(7719);
+    ctx.fillStyle = '#5d6b45';
+    ctx.fillRect(0, 0, S, S);
+
+    // 大尺度斑块：干枯 / 深绿 / 泛土，只有它们不重复
+    const big = ['#6d7a4e', '#57643f', '#7d8558', '#4c5a38', '#8a8460', '#646f47'];
+    for (let i = 0; i < 240; i++) {
+      ctx.globalAlpha = 0.10 + rand() * 0.16;
+      ctx.fillStyle = big[(rand() * big.length) | 0];
+      ctx.beginPath();
+      ctx.ellipse(rand() * S, rand() * S, 40 + rand() * 150, 26 + rand() * 110, rand() * 3.14, 0, 6.3);
+      ctx.fill();
+    }
+
+    // 中尺度草簇与裸土
+    for (let i = 0; i < 1400; i++) {
+      const dry = rand() < 0.22;
+      ctx.globalAlpha = 0.12 + rand() * 0.22;
+      ctx.fillStyle = dry ? (rand() < 0.5 ? '#8b8264' : '#6f6a4e')
+        : ['#6f7d50', '#5a683f', '#7a875a', '#4e5c3a'][(rand() * 4) | 0];
+      ctx.beginPath();
+      ctx.ellipse(rand() * S, rand() * S, 3 + rand() * 16, 2 + rand() * 11, rand() * 3.14, 0, 6.3);
+      ctx.fill();
+    }
+
+    // 细颗粒：把色阶彻底打散
+    for (let i = 0; i < 42000; i++) {
+      ctx.globalAlpha = 0.16 + rand() * 0.3;
+      ctx.fillStyle = rand() < 0.5 ? '#7c885b' : '#4a5636';
+      ctx.fillRect(rand() * S, rand() * S, 1 + (rand() < 0.3 ? 1 : 0), 1 + rand() * 2);
+    }
+
+    // 几道被车轮压秃的土路
+    for (let i = 0; i < 4; i++) {
+      ctx.globalAlpha = 0.16;
+      ctx.strokeStyle = '#8b8168';
+      ctx.lineWidth = 5 + rand() * 9;
+      ctx.beginPath();
+      let x = rand() * S, y = rand() * S;
+      ctx.moveTo(x, y);
+      for (let k = 0; k < 5; k++) {
+        x += (rand() - 0.5) * 420;
+        y += (rand() - 0.5) * 420;
+        ctx.quadraticCurveTo(x + (rand() - 0.5) * 90, y + (rand() - 0.5) * 90, x, y);
+      }
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    return c;
+  }
 
   /* 发光贴图（灯头 / 地面光斑 / 粒子共用） */
   U.radialTexture = function (inner, mid) {

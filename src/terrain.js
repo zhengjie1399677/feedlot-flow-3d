@@ -198,6 +198,19 @@ import { FL } from './fl.js';
     ctx.lineWidth = Math.max(0.8, (S / span) * 0.9);
     ctx.stroke();
 
+    // 东北角出场道路：场内东侧道路在 (112, 96) 出北栅栏，场外这一段必须接上，
+    // 否则空车从大门出去就是悬在田里（原来就是这里断的）
+    const n0 = P(112, 96), n1 = P(116, 200), n2 = P(128, 420), n3 = P(168, 760);
+    ctx.strokeStyle = '#4a4640';
+    ctx.lineWidth = Math.max(2.4, (S / span) * 11);
+    ctx.beginPath();
+    ctx.moveTo(n0[0], n0[1]);
+    ctx.bezierCurveTo(n1[0], n1[1], n2[0], n2[1], n3[0], n3[1]);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(190,178,140,0.28)';
+    ctx.lineWidth = Math.max(0.8, (S / span) * 0.9);
+    ctx.stroke();
+
     // 南边的县道：东西向穿过平原
     const S1 = P(-1400, 620), S2 = P(1400, 560);
     ctx.strokeStyle = '#48443e';

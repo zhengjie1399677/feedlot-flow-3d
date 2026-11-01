@@ -89,6 +89,9 @@ import { FL } from './fl.js';
 
     let lastHour = -999;
 
+    let fogSpan = 0;
+    const phaseOut = { night: 1, dusk: 0, day: 0, fogSpan: 0 };
+
     function setHour(hour) {
       const h = ((hour % 24) + 24) % 24;
       if (Math.abs(h - lastHour) < 0.002) return;
@@ -127,6 +130,8 @@ import { FL } from './fl.js';
         }
         azVec.set(Math.cos(az), 0, Math.sin(az));
         sky.setSky(cTop, cMid, cHor, cGlow, azVec, 1.0);
+        // 环境图跟着同一套颜色重烘，金属/玻璃的反光才不会永远是夜空
+        if (FL.env && FL.env.update) FL.env.update(cTop, cMid, cHor, cGlow, azVec);
         // 地平线以下的地气与云量：让场地边缘不再是一刀切进天空
         if (sky.setLand) sky.setLand(blend(P.night.land, P.dusk.land, P.day.land, nightF, dayF));
         if (sky.setCloud) sky.setCloud(P.night.cloud * nightF + P.dusk.cloud * duskMix + P.day.cloud * dayF * (1 - duskMix));
@@ -180,16 +185,20 @@ import { FL } from './fl.js';
         // 雾色必须等于看向地平线时看到的颜色，否则远景和天空之间会有一条缝
         cFog.copy(P.night.fog).lerp(cHor, 1 - nightF).lerp(cGlow, 0.22 * duskMix);
         scene.fog.color.copy(cFog);
-        // 雾从 260m 之外才开始起作用，场地本体（254m）几乎不受影响
+        // 雾的起点只是「下限」：主循环会按相机距离把它推到场地之外，
+        // 否则镜头一拉远，场地本体自己就先被雾糊住了（雾该吃的是远景）
+        fogSpan = mix3(1150, 1450, 2000);
         scene.fog.near = mix3(180, 240, 300);
-        scene.fog.far = mix3(1150, 1450, 2000);
+        scene.fog.far = scene.fog.near + fogSpan;
         // 地平线以下的地色直接取雾色：远处地形吃成全雾色后与天空无缝
         if (sky && sky.setLand) sky.setLand(cFog);
       }
-      if (pipe && pipe.setExposure) pipe.setExposure(mix3(1.34, 1.06, 0.96));
+      if (pipe && pipe.setExposure) pipe.setExposure(mix3(1.30, 1.18, 0.98));
 
       // 供 UI 判断时段
-      return { night: nightF, dusk: duskF, day: dayF };
+      phaseOut.night = nightF; phaseOut.dusk = duskF; phaseOut.day = dayF;
+      phaseOut.fogSpan = fogSpan;
+      return phaseOut;
     }
 
     return { setHour: setHour };

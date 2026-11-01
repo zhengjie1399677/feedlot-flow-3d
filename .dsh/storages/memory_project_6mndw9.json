@@ -1,0 +1,32 @@
+{
+  "unit": {
+    "name": "memory_project_6mndw9",
+    "version": 1
+  },
+  "global": null,
+  "tables": {
+    "blocks": {
+      "cc2c80d2-1376-41ed-b355-60d87a69301f": {
+        "namespace": "project",
+        "status": "approved",
+        "injected": false,
+        "source": "agent",
+        "content": "feedlot-flow-3d 的 GitHub Pages 已于 2026-11-01 从「legacy / main 分支根目录」改成 **build_type: workflow**：Vite 迁移后仓根 index.html 只挂 /src/main.js，legacy 直发仓根必然白屏，必须由 `.github/workflows/deploy.yml` 构建 dist 再 upload-pages-artifact。这个设置只在 GitHub 仓库设置里（`gh api -X PUT repos/<owner>/<repo>/pages -f build_type=workflow`），仓库代码里看不出来——以后若部署成功但站点白屏/404，先查这一项。线上地址 https://zhengjie1399677.github.io/feedlot-flow-3d/ ，vite `base: './'` 适配该子路径。",
+        "keywords": [
+          "feedlot-flow-3d",
+          "github pages",
+          "build_type",
+          "workflow",
+          "部署",
+          "deploy",
+          "vite",
+          "白屏",
+          "legacy",
+          "gh api"
+        ],
+        "createdAt": 1793537082821,
+        "updatedAt": 1793537082821
+      }
+    }
+  }
+}
