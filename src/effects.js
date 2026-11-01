@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 import { FL } from './fl.js';
 
 /* ============================================================
@@ -8,12 +9,13 @@ import { FL } from './fl.js';
   const L = FL.LAYOUT;
 
   /* ---------------- 环境贴图 ---------------- */
-  // 环境图必须跟着昼夜走。原来是启动时烘一次"夜景"就不管了，于是正午的金属、
-  // 玻璃里反射的全是夜空。现在按当前天光颜色现烘，颜色变化超过阈值才重烘一次
-  // （整轮昼夜约 20 次，PMREM 在 256×128 上只有几毫秒）。
+  // 环境图用 Poly Haven 的 CC0 全景图（土默川那种干爽天空），按时段挑一张，
+  // 转成 PMREM 交给 scene.environment。程序化那张 canvas 图留作兜底：
+  // 文件没到位、或者 .hdr 解析失败时仍然能有一个跟天光同步的反射。
   FL.createEnvironment = function (scene, renderer) {
     const pmrem = new THREE.PMREMGenerator(renderer);
     pmrem.compileEquirectangularShader();
+
     const w = 256, h = 128;
     const cv = document.createElement('canvas');
     cv.width = w; cv.height = h;
@@ -23,7 +25,43 @@ import { FL } from './fl.js';
     tex.colorSpace = THREE.SRGBColorSpace;
     let rt = null;
     const last = { r: -9, g: -9, b: -9, sun: new THREE.Vector2(0, 0) };
+    let phaseKey = 'day';
 
+    /* --- 四张 CC0 全景图，按天光强度缩放 --- */
+    const FILES = {
+      dawn: 'hdri/qwantani_dawn_puresky.hdr',
+      day: 'hdri/qwantani_noon_puresky.hdr',
+      dusk: 'hdri/qwantani_sunset_puresky.hdr',
+      night: 'hdri/qwantani_night_puresky.hdr',
+    };
+    const INTENSITY = { dawn: 0.05, day: 0.10, dusk: 0.035, night: 0.08 };
+    const envs = {};
+    const loading = {};
+
+    function ensureEnv(key) {
+      if (envs[key] || loading[key]) return;
+      loading[key] = true;
+      new RGBELoader().load(FILES[key], function (t) {
+        t.mapping = THREE.EquirectangularReflectionMapping;
+        const out = pmrem.fromEquirectangular(t);
+        envs[key] = out.texture;
+        loading[key] = false;
+        t.dispose();
+        if (key === phaseKey) apply(key);
+      }, undefined, function () {
+        loading[key] = false;
+      });
+    }
+
+    function apply(key) {
+      const e = envs[key];
+      if (!e) return false;
+      scene.environment = e;
+      scene.environmentIntensity = INTENSITY[key] || 1;
+      return true;
+    }
+
+    /* --- 程序化兜底 --- */
     function paint(top, mid, hor, glow, sunDir) {
       ctx.clearRect(0, 0, w, h);
       const g = ctx.createLinearGradient(0, 0, 0, h);
@@ -34,7 +72,6 @@ import { FL } from './fl.js';
       g.addColorStop(1.0, '#0b0d0b');
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, w, h);
-      // 太阳方位的一团光：决定高光往哪边甩
       if (sunDir) {
         const sx = ((Math.atan2(sunDir.x, sunDir.z) / (Math.PI * 2)) + 0.5) * w;
         const sy = h * 0.44;
@@ -47,7 +84,6 @@ import { FL } from './fl.js';
         rg.addColorStop(1, 'rgba(0,0,0,0)');
         ctx.fillStyle = rg;
         ctx.fillRect(0, 0, w, h);
-        // 对侧再补一团弱光，避免球面另一侧全黑成一块
         const bx = (sx + w / 2) % w;
         const bg = ctx.createRadialGradient(bx, h * 0.5, 0, bx, h * 0.5, w * 0.3);
         bg.addColorStop(0, 'rgba(120,140,170,0.22)');
@@ -62,24 +98,39 @@ import { FL } from './fl.js';
       paint(top, mid, hor, glow, sunDir);
       const next = pmrem.fromEquirectangular(tex);
       scene.environment = next.texture;
+      scene.environmentIntensity = 1;
       if (rt) rt.dispose();
       rt = next;
     }
 
-    // 先用一套中性天光占位，等 daycycle 第一次 setHour 就会按真实时刻重烘
     rebuild(new THREE.Color(0.16, 0.21, 0.30), new THREE.Color(0.42, 0.47, 0.55),
       new THREE.Color(0.72, 0.68, 0.60), new THREE.Color(1.0, 0.72, 0.42), null);
 
     return {
-      update: function (top, mid, hor, glow, sunDir) {
+      update: function (top, mid, hor, glow, sunDir, nightF, duskF, dayF) {
         if (!top) return;
         const dr = Math.abs(top.r - last.r) + Math.abs(mid.g - last.g) + Math.abs(hor.b - last.b);
         const sunMoved = sunDir ? Math.hypot(sunDir.x - last.sun.x, sunDir.z - last.sun.y) : 0;
         if (dr < 0.05 && sunMoved < 0.06) return;
         last.r = top.r; last.g = mid.g; last.b = hor.b;
         if (sunDir) { last.sun.x = sunDir.x; last.sun.y = sunDir.z; }
-        rebuild(top, mid, hor, glow, sunDir);
+
+        // 哪一段当权重最大就用哪一张全景图；四张都预取，切换时不用等
+        const night = nightF == null ? 0 : nightF;
+        const dusk = duskF == null ? 0 : duskF;
+        const day = dayF == null ? 0 : dayF;
+        let key = 'day';
+        if (night > 0.6) key = 'night';
+        else if (dusk > 0.55) key = 'dusk';
+        else if (night > 0.32) key = night > dusk ? 'night' : 'dusk';
+        else if (dusk > 0.28 && day < 0.55) key = 'dusk';
+        else if (dusk > 0.15 && day < 0.35) key = 'dawn';
+        phaseKey = key;
+
+        ensureEnv(key);
+        if (!apply(key)) rebuild(top, mid, hor, glow, sunDir);
       },
+      preload: function () { Object.keys(FILES).forEach(ensureEnv); },
     };
   };
 

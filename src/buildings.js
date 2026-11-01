@@ -1310,7 +1310,6 @@ import { FL } from './fl.js';
     const aisle = P.aisle || 5.2;
     const rowD = Math.min(5.2, (P.z1 - P.z0 - aisle) / 2);
     const n = Math.floor((P.x1 - P.x0) / st);
-    const paints = [M.wall, M.galv, M.red, M.blue, M.steelLight, M.timberLight, M.wall, M.galv];
 
     // 铺装与车位线
     U.box(kit, M.asphalt, P.x1 - P.x0, 0.1, P.z1 - P.z0, (P.x0 + P.x1) / 2, 0.29, midZ, 0, 0, 0, 2);
@@ -1323,15 +1322,22 @@ import { FL } from './fl.js';
     U.box(kit, M.line, P.x1 - P.x0, 0.03, 0.14, (P.x0 + P.x1) / 2, 0.36, midZ + aisle / 2);
 
     // 车位上的车（按固定节奏留空位，看着像停了大半）
-    const order = [3, 1, 5, 2, 0, 4, 6, 2, 7, 0, 3, 5, 1, 4, 0, 6, 2, 7, 3, 1, 5, 0, 4, 2, 6, 3, 1, 0, 5, 2, 7, 4];
+    const order = [3, 1, 5, 2, 0, 4, 6, 2, 3, 0, 5, 1, 4, 0, 6, 2, 3, 5, 1, 6, 0, 4, 2, 6, 3, 1, 0, 5, 2, 4];
     let k = 0;
     for (let i = 0; i < n; i++) {
       const x = P.x0 + st * (i + 0.5);
       for (const half of [0, 1]) {
         const z = half === 0 ? P.z0 + rowD / 2 - 0.15 : P.z1 - rowD / 2 + 0.15;
-        const rot = half === 0 ? Math.PI / 2 : -Math.PI / 2;
+        const rot = half === 0 ? 0 : Math.PI;   // Kenney 车模的长轴是 z，车头朝 z 正/负
         if ((i * 3 + half * 5) % 7 === 2) { k++; continue; }
-        parkedCar(kit, M, x, z, rot, paints[order[k % order.length]]);
+        if (!world.parkingSlots) world.parkingSlots = [];
+        world.parkingSlots.push({
+          x: x,
+          y: 0.35,
+          z: z,
+          rot: rot,
+          kind: FL.CAR_MODELS[order[k % order.length] % FL.CAR_MODELS.length],
+        });
         k++;
       }
     }

@@ -131,7 +131,7 @@ import { FL } from './fl.js';
         azVec.set(Math.cos(az), 0, Math.sin(az));
         sky.setSky(cTop, cMid, cHor, cGlow, azVec, 1.0);
         // 环境图跟着同一套颜色重烘，金属/玻璃的反光才不会永远是夜空
-        if (FL.env && FL.env.update) FL.env.update(cTop, cMid, cHor, cGlow, azVec);
+        if (FL.env && FL.env.update) FL.env.update(cTop, cMid, cHor, cGlow, azVec, nightF, duskF, dayF);
         // 地平线以下的地气与云量：让场地边缘不再是一刀切进天空
         if (sky.setLand) sky.setLand(blend(P.night.land, P.dusk.land, P.day.land, nightF, dayF));
         if (sky.setCloud) sky.setCloud(P.night.cloud * nightF + P.dusk.cloud * duskMix + P.day.cloud * dayF * (1 - duskMix));

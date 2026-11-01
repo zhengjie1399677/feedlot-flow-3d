@@ -135,31 +135,50 @@ import { FL } from './fl.js';
       m.envMapIntensity = 0.82;
       return m;
     };
+    // 开源 PBR 材质（ambientCG CC0）：albedo + normal + roughness + ao，
+    // 贴图按 U.box 的世界尺度 uv 铺开，normalMap 让彩钢板的肋和混凝土的气孔
+    // 真的凸出来——几何没变，读起来的"表面"已经不是那块色板了。
+    const PBR = (surfName, color, rough, metal, tile) => {
+      const t = U.surface(surfName, { tile: tile });
+      const m = S({
+        map: t.map,
+        normalMap: t.normalMap,
+        roughnessMap: t.roughnessMap,
+        aoMap: t.aoMap,
+        metalnessMap: t.metalnessMap,
+        color: color,
+        roughness: rough,
+        metalness: metal,
+        normalScale: new THREE.Vector2(1, 1),
+      });
+      m.userData.tile = tile;
+      return m;
+    };
     const M = {};
     M.soil = S({ color: 0x1b1d18, roughness: 1 });
     M.plinth = S({ color: 0x0d100e, roughness: 1 });
     M.grass = S({ map: T.grass, color: 0xb4c296, roughness: 1 });
     M.lawn = S({ map: T.lawn, color: 0xa8b184, roughness: 1 });
-    M.apron = S({ map: T.concrete, color: 0xa3a8aa, roughness: 0.92, metalness: 0.02 });
-    M.apronEdge = S({ map: T.concreteDark, color: 0x6d7376, roughness: 0.95 });
-    M.asphalt = S({ map: T.asphalt, color: 0x9fa8ad, roughness: 0.95, metalness: 0.02 });
-    M.curb = S({ map: T.concreteDark, color: 0x8b9194, roughness: 0.95 });
+    M.apron = PBR('Concrete034', 0x77848e, 0.92, 0.02, 7);
+    M.apronEdge = PBR('Concrete034', 0x6d7c86, 0.95, 0.02, 5);
+    M.asphalt = PBR('Asphalt033', 0x5f6468, 0.95, 0.02, 9);
+    M.curb = PBR('Concrete034', 0x808f98, 0.95, 0.02, 2.2);
     M.line = S({ color: 0xb8c2c4, roughness: 0.7 });
     M.yellow = S({ color: 0xc79b3f, roughness: 0.65, metalness: 0.15 });
-    M.yard = S({ map: T.concreteDark, color: 0x7f8588, roughness: 0.95 });
-    M.floor = S({ map: T.concrete, color: 0xa8a79e, roughness: 0.9 });
-    M.wall = S({ map: T.concrete, color: 0xc2bcaa, roughness: 0.9 });
-    M.wallCool = S({ map: T.concrete, color: 0x9aa4a6, roughness: 0.9 });
-    M.wallDark = S({ map: T.corrugated, color: 0x899da4, roughness: 0.6, metalness: 0.3 });
-    M.roof = S({ map: T.roof, color: 0x96604a, roughness: 0.6, metalness: 0.22 });
-    M.roofSouth = S({ map: T.roof, color: 0x7f4f45, roughness: 0.62, metalness: 0.2 });
+    M.yard = PBR('Concrete034', 0x73828b, 0.95, 0.02, 6);
+    M.floor = PBR('Concrete034', 0x8e979c, 0.9, 0.02, 5);
+    M.wall = PBR('PaintedPlaster017', 0xa9a496, 0.9, 0.02, 4);
+    M.wallCool = PBR('PaintedPlaster017', 0x8a9193, 0.9, 0.02, 4);
+    M.wallDark = PBR('CorrugatedSteel009', 0x748388, 0.62, 0.35, 2.4);
+    M.roof = PBR('CorrugatedSteel009', 0x7a5447, 0.62, 0.3, 2.4);
+    M.roofSouth = PBR('CorrugatedSteel009', 0x6c4740, 0.64, 0.28, 2.4);
     M.skylight = S({ map: T.roof, color: 0xd3e2ea, roughness: 0.28, metalness: 0.18 });
-    M.roofPlant = S({ map: T.roof, color: 0x9fb3bb, roughness: 0.5, metalness: 0.35 });
+    M.roofPlant = PBR('CorrugatedSteel009', 0x8a979c, 0.52, 0.38, 2.4);
     M.timber = S({ color: 0x54402f, roughness: 0.85 });
     M.timberLight = S({ color: 0x8a6a4a, roughness: 0.85 });
     M.steel = S({ color: 0x38424a, roughness: 0.42, metalness: 0.75 });
     M.steelLight = S({ color: 0xa7b5bd, roughness: 0.3, metalness: 0.85 });
-    M.galv = S({ map: T.corrugated, color: 0xc4ced2, roughness: 0.4, metalness: 0.6 });
+    M.galv = PBR('CorrugatedSteel009', 0xa8b2b6, 0.42, 0.62, 1.8);
     M.glass = S({ color: 0x0c161d, roughness: 0.07, metalness: 0.9 });
     M.concreteTrough = S({ color: 0x8f918a, roughness: 0.95 });
     M.feed = S({ color: 0x6c5029, roughness: 1 });

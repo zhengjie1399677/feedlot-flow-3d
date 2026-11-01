@@ -73,7 +73,9 @@ npm run preview   # 本地预览构建产物
 ```
 index.html            入口，只挂一个 <script type="module" src="/src/main.js">
 vite.config.js        base:'./'（Pages 子路径可用）、dist 输出、glb 资产
-public/models/        cow_polyfork.glb（会被原样拷进 dist/models/）
+public/models/        cow_polyfork.glb + cars/（Kenney 车模，原样拷进 dist/models/）
+public/hdri/          四张 256×128 全景图（晨 / 午 / 黄昏 / 夜），按时刻切换环境光
+public/tex/           四套 PBR 贴图（color / normal / rough / ao），ambientCG 512²
 css/style.css         深色工业风界面（标题 / 图例 / 视角 / 流程条 / 载入遮罩）
 src/main.js           装配、主循环、自适应、URL 参数
 src/fl.js             全局命名空间对象（各模块往上面挂 API）
@@ -82,9 +84,10 @@ src/layout.js         唯一的数据源：地块、路网、车辆路线、流�
 src/world.js          地面 / 道路 / 围栏 / 灯杆 / 树 / 标签 / 灯光 / 地面光池
 src/terrain.js        场界之外的地形：条田贴图、农田防护林、村庄、进场道路延伸
 src/cows.js           牛群：GLTF + 骨骼动画
+src/cars.js           停车场的车：GLB 载入 + 按车位摆放
 src/buildings.js      牛舍、地磅、大门、办公室、TMR 车间与筒仓、卸牛台、装车台、交易中心、员工楼、停车场、围墙
 src/vehicles.js       车辆造型 + 运动物理（加减速 / 跟车让行 / 刹车灯 / 转向灯）
-src/effects.js        环境贴图、天空穹顶与星空、相机轨道、泛光管线
+src/effects.js        环境贴图（HDRI 分时段）、天空穹顶与星空、相机轨道、泛光管线
 src/daycycle.js       昼夜循环：按时刻插值天光、日月、场灯、雾、曝光
 src/ui.js             图例 / 视角按钮 / 流程条 / 时钟
 tools/shots.sh        无头 Chrome 出 3 机位 × 3 时刻的对照图组
@@ -99,7 +102,7 @@ tools/diff.py         两组对照图做像素差，标出可见差异
 - 需要 WebGL2；three.js r187（ESM），addons 只用了 `GLTFLoader` 与 `SkeletonUtils`。
 - 几何按材质合并（`U.Kit`），整场 draw call 压在一百以内；阴影贴图 2048，只留一盏主光投影。
 - 场景尺寸和像素比都做了限制（`devicePixelRatio` 最高 1.6），1080p 下目标 60fps。
-- 构建产物单个 chunk 775 kB（gzip 208 kB）；`vite build` 会提示 chunk > 500 kB，属于预期——几何与贴图全是代码生成的，没有可拆的异步边界。
+- 构建产物的 JS 约 790 kB（gzip 212 kB），另有 `public/` 下按需加载的模型与贴图约 5 MB（牛 1.5 MB、车 1.35 MB、贴图 760 kB、全景图 512 kB）；`vite build` 会提示 chunk > 500 kB，属于预期——几何与贴图全是代码生成的，没有可拆的异步边界。
 
 ## 改完怎么验：对照图组
 

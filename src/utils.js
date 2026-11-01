@@ -60,6 +60,68 @@ import { FL } from './fl.js';
   }
   U.makeTexture = makeTexture;
 
+  /* ---------------- 开源 PBR 材质（ambientCG CC0） ----------------
+   * public/tex/<name>/color.jpg | normal.jpg | rough.jpg | ao.jpg | metal.jpg
+   * 贴图是异步到位的：先返回空贴图占位，图到了 three 自己补上，
+   * 加载遮罩期间就能全部就位，不会看到「先没有后突然出现」。
+   * tile 是这套贴图在世界里对应的边长（米），UV 由 U.box 按尺寸铺。 */
+  const surfaceCache = {};
+  const texLoader = new THREE.TextureLoader();
+
+  function loadMap(url, srgb, aniso) {
+    const t = texLoader.load(url);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+    t.anisotropy = aniso || 8;
+    return t;
+  }
+
+  U.surface = function (name, opts) {
+    opts = opts || {};
+    if (surfaceCache[name]) return surfaceCache[name];
+    const base = 'tex/' + name + '/';
+    const aniso = opts.aniso || 8;
+    const out = {
+      map: loadMap(base + 'color.jpg', true, aniso),
+      normalMap: loadMap(base + 'normal.jpg', false, aniso),
+      roughnessMap: loadMap(base + 'rough.jpg', false, aniso),
+      aoMap: loadMap(base + 'ao.jpg', false, aniso),
+      metalnessMap: loadMap(base + 'metal.jpg', false, aniso),
+      tile: opts.tile || 3,
+    };
+    surfaceCache[name] = out;
+    return out;
+  };
+
+  // 把 BoxGeometry 的 uv 从 0..1 改成「每 tile 米一次」，这样同一套贴图
+  // 铺在 40 m 长的墙和 2 m 的箱子上都是同一个物理尺度，不会被拉伸成布块。
+  const BOX_FACE_DIMS = [
+    ['d', 'h'], // +x
+    ['d', 'h'], // -x
+    ['w', 'd'], // +y
+    ['w', 'd'], // -y
+    ['w', 'h'], // +z
+    ['w', 'h'], // -z
+  ];
+
+  U.boxUV = function (geo, w, h, d, tile) {
+    const uv = geo.getAttribute('uv');
+    if (!uv || !tile) return geo;
+    const dims = { w: w, h: h, d: d };
+    const arr = uv.array;
+    for (let f = 0; f < 6; f++) {
+      const su = dims[BOX_FACE_DIMS[f][0]] / tile;
+      const sv = dims[BOX_FACE_DIMS[f][1]] / tile;
+      for (let i = 0; i < 4; i++) {
+        const o = (f * 4 + i) * 2;
+        arr[o] *= su;
+        arr[o + 1] *= sv;
+      }
+    }
+    uv.needsUpdate = true;
+    return geo;
+  };
+
   function asphalt() {
     const S = 512;
     const c = makeCanvas(S);
@@ -520,6 +582,9 @@ import { FL } from './fl.js';
 
   U.box = function (kit, mat, w, h, d, x, y, z, rx, ry, rz, r) {
     const g = r ? U.roundedBox(w, h, d, r) : new THREE.BoxGeometry(w, h, d);
+    // 材质声明了自己在世界里的铺贴边长（userData.tile），就按尺寸把 uv 铺开，
+    // 免得 40 m 的墙和 2 m 的箱子共用同一张 0..1 的图、一个拉成条纹一个糊成色块
+    if (!r && mat && mat.userData && mat.userData.tile) U.boxUV(g, w, h, d, mat.userData.tile);
     kit.add(g, mat, U.mat4(x, y, z, rx, ry, rz));
   };
 

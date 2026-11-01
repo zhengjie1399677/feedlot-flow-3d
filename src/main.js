@@ -5,6 +5,7 @@ import './layout.js';
 import './world.js';
 import './terrain.js';
 import './buildings.js';
+import './cars.js';
 import './cows.js';
 import './vehicles.js';
 import './effects.js';
@@ -90,8 +91,12 @@ function boot() {
   let cutUpdate = null;   // 幽灵屋顶的每帧插值（在 try 块里赋值，frame 在外面用）
   try {
     FL.env = FL.createEnvironment(scene, renderer);
+    // 四张全景图先都取回来，切换时不用等网络
+    if (FL.env && FL.env.preload) FL.env.preload();
     world = FL.buildWorld(scene);
     if (FL.createTerrain) FL.createTerrain(scene, world);
+    // 停车场的车换成现成模型（Kenney CC0），盒子车退出历史舞台
+    if (FL.createParkedCars) FL.createParkedCars(world);
     sky = FL.createSky(scene, world);
     fleet = FL.buildFleet(scene);
     if (FL.buildHerd) herd = FL.buildHerd(scene, FL.herdSpots(FL.LAYOUT || window.LAYOUT || {}));

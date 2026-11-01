@@ -3,6 +3,8 @@ tools/*
 !tools/shots.sh
 !tools/sheet.py
 !tools/diff.py
+!tools/hdr_min.py
+!tools/tex_prep.py
 
 node_modules/
 dist/
