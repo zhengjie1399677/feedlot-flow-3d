@@ -53,7 +53,7 @@ import { FL } from './fl.js';
     // 28 段球体每段 ~6°，等于把渐变压成了一条硬边，黄昏一出就是一条横带。
     // 注意：pow() 的底数一旦为负会得到 NaN，在 ANGLE 上表现为整片黑块——这里所有
     // pow 的底数都先夹到非负（历史上就栽在这上面，所以天空一直退回顶点色）。
-    const skyGeo = new THREE.SphereGeometry(1200, 48, 32);
+    const skyGeo = new THREE.SphereGeometry(9000, 48, 32);
     const skyMat = new THREE.ShaderMaterial({
       side: THREE.BackSide,
       depthWrite: false,

@@ -3,6 +3,7 @@ import { FL } from './fl.js';
 import './utils.js';
 import './layout.js';
 import './world.js';
+import './terrain.js';
 import './buildings.js';
 import './cows.js';
 import './vehicles.js';
@@ -83,13 +84,14 @@ function boot() {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x04070a);
 
-  const camera = new THREE.PerspectiveCamera(36, window.innerWidth / Math.max(1, window.innerHeight), 4, 3400);
+  const camera = new THREE.PerspectiveCamera(36, window.innerWidth / Math.max(1, window.innerHeight), 4, 20000);
 
   let world, fleet, rig, pipe, ui, sky, day, herd;
   let cutUpdate = null;   // 幽灵屋顶的每帧插值（在 try 块里赋值，frame 在外面用）
   try {
     FL.createEnvironment(scene, renderer);
     world = FL.buildWorld(scene);
+    if (FL.createTerrain) FL.createTerrain(scene, world);
     sky = FL.createSky(scene, world);
     fleet = FL.buildFleet(scene);
     if (FL.buildHerd) herd = FL.buildHerd(scene, FL.herdSpots(FL.LAYOUT || window.LAYOUT || {}));

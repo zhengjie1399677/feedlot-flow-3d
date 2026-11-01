@@ -80,6 +80,7 @@ src/fl.js             全局命名空间对象（各模块往上面挂 API）
 src/utils.js          程序化贴图、倒角盒、几何合并 Kit、文字贴图、曲线 Path、补间
 src/layout.js         唯一的数据源：地块、路网、车辆路线、流向带、六个阶段、镜头预设
 src/world.js          地面 / 道路 / 围栏 / 灯杆 / 树 / 标签 / 灯光 / 地面光池
+src/terrain.js        场界之外的地形：条田贴图、农田防护林、村庄、进场道路延伸
 src/cows.js           牛群：GLTF + 骨骼动画
 src/buildings.js      牛舍、地磅、大门、办公室、TMR 车间与筒仓、卸牛台、装车台、交易中心、员工楼、停车场、围墙
 src/vehicles.js       车辆造型 + 运动物理（加减速 / 跟车让行 / 刹车灯 / 转向灯）

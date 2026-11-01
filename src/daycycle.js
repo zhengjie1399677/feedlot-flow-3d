@@ -182,7 +182,9 @@ import { FL } from './fl.js';
         scene.fog.color.copy(cFog);
         // 雾从 260m 之外才开始起作用，场地本体（254m）几乎不受影响
         scene.fog.near = mix3(180, 240, 300);
-        scene.fog.far = mix3(1250, 1650, 2100);
+        scene.fog.far = mix3(1150, 1450, 2000);
+        // 地平线以下的地色直接取雾色：远处地形吃成全雾色后与天空无缝
+        if (sky && sky.setLand) sky.setLand(cFog);
       }
       if (pipe && pipe.setExposure) pipe.setExposure(mix3(1.34, 1.06, 0.96));
 
