@@ -48,31 +48,113 @@ import { FL } from './fl.js';
 
   /* ---------------- 天空 / 星空 / 灯柱 ---------------- */
   FL.createSky = function (scene, world) {
-    // 天空穹顶用顶点色（MeshBasicMaterial），不用自定义 shader：
-    // 之前那版 ShaderMaterial 在真机 ANGLE 上会整片发黑，排查成本太高。
-    const skyGeo = new THREE.SphereGeometry(1200, 48, 28);
-    const posAttr = skyGeo.attributes.position;
-    const colors = new Float32Array(posAttr.count * 3);
-    skyGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    const skyMat = new THREE.MeshBasicMaterial({
-      side: THREE.BackSide, vertexColors: true, depthWrite: false, fog: false, toneMapped: false,
+    // 穹顶用一个小 shader 逐像素画：竖直梯度 + 地平线暖带 + 日/月晕 + 薄云 + 地平线下地气。
+    // 用 shader 而不是顶点色的原因：地平线那圈渐变在 0.18 的球体高度里就完成，
+    // 28 段球体每段 ~6°，等于把渐变压成了一条硬边，黄昏一出就是一条横带。
+    // 注意：pow() 的底数一旦为负会得到 NaN，在 ANGLE 上表现为整片黑块——这里所有
+    // pow 的底数都先夹到非负（历史上就栽在这上面，所以天空一直退回顶点色）。
+    const skyGeo = new THREE.SphereGeometry(1200, 48, 32);
+    const skyMat = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      depthWrite: false,
+      fog: false,
+      toneMapped: false,
+      uniforms: {
+        uTop: { value: new THREE.Color(0.030, 0.040, 0.090) },
+        uMid: { value: new THREE.Color(0.105, 0.070, 0.095) },
+        uHor: { value: new THREE.Color(0.620, 0.260, 0.100) },
+        uLand: { value: new THREE.Color(0.055, 0.048, 0.045) },
+        uGlow: { value: new THREE.Color(0.80, 0.30, 0.09) },
+        uGlowI: { value: 1.0 },
+        uSun: { value: new THREE.Vector3(0.3, 0.1, 0.9).normalize() },
+        uSunCol: { value: new THREE.Color(1.0, 0.72, 0.42) },
+        uSunI: { value: 1.0 },
+        uCloudI: { value: 0.5 },
+        uTime: { value: 0 },
+      },
+      vertexShader: [
+        'varying vec3 vDir;',
+        'void main() {',
+        '  vDir = position;',
+        '  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);',
+        '}',
+      ].join('\n'),
+      fragmentShader: [
+        'varying vec3 vDir;',
+        'uniform vec3 uTop, uMid, uHor, uLand, uGlow, uSunCol, uSun;',
+        'uniform float uGlowI, uSunI, uCloudI, uTime;',
+        '',
+        'float hash21(vec2 p) {',
+        '  p = fract(p * vec2(123.34, 345.45));',
+        '  p += dot(p, p + 34.345);',
+        '  return fract(p.x * p.y);',
+        '}',
+        'float vnoise(vec2 p) {',
+        '  vec2 i = floor(p), f = fract(p);',
+        '  f = f * f * (3.0 - 2.0 * f);',
+        '  float a = hash21(i);',
+        '  float b = hash21(i + vec2(1.0, 0.0));',
+        '  float c = hash21(i + vec2(0.0, 1.0));',
+        '  float d = hash21(i + vec2(1.0, 1.0));',
+        '  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);',
+        '}',
+        'float fbm(vec2 p) {',
+        '  float s = 0.0, a = 0.55;',
+        '  for (int i = 0; i < 4; i++) {',
+        '    s += a * vnoise(p);',
+        '    p = p * 2.03 + 17.0;',
+        '    a *= 0.5;',
+        '  }',
+        '  return s;',
+        '}',
+        '',
+        'void main() {',
+        '  vec3 d = normalize(vDir);',
+        '  float y = d.y;',
+        '  float hy = max(y, 0.0);',
+        '  vec3 sun = normalize(uSun);',
+        // 只取水平分量做方位权重，太阳落下去时暖带才会沿地平线铺开
+        '  vec3 dh = normalize(vec3(d.x, 0.0, d.z) + vec3(1e-5));',
+        '  vec3 sh = normalize(vec3(sun.x, 0.0, sun.z) + vec3(1e-5));',
+        '  float az = max(0.0, dot(dh, sh));',
+        '',
+        // 竖直梯度：地平线 → 中段 → 天顶，三段用 smoothstep 过渡（逐像素，没有分段硬边）
+        '  vec3 col = mix(uHor, uMid, smoothstep(0.0, 0.16, hy));',
+        '  col = mix(col, uTop, smoothstep(0.10, 0.62, hy));',
+        '',
+        // 地平线暖带：朝太阳方位最亮，两侧迅速衰减
+        '  float band = (1.0 - smoothstep(0.0, 0.30, hy)) * smoothstep(-0.05, 0.02, y);',
+        '  col += uGlow * pow(az, 3.0) * band * uGlowI;',
+        '',
+        // 日晕：一级宽散射 + 二级紧贴核心，日落时整片天会跟着橙
+        '  float sd = max(0.0, dot(d, sun));',
+        '  col += uSunCol * (pow(sd, 8.0) * 0.16 + pow(sd, 220.0) * 0.95) * uSunI;',
+        '',
+        // 薄云：把视线投到一块高空平面上取 fbm，纯装饰，不参与光照
+        '  if (uCloudI > 0.002 && y > 0.012) {',
+        '    vec2 cuv = d.xz / max(y, 0.05) * 0.11;',
+        '    cuv += vec2(uTime * 0.0032, uTime * 0.0011);',
+        // 覆盖率靠 smoothstep 的下限压住：fbm 的均值在 0.5 附近，
+        // 下限给低了整片天都会糊上一层灰
+        '    float c = smoothstep(0.58, 0.86, fbm(cuv * 1.9));',
+        '    float alt = smoothstep(0.012, 0.10, y) * (1.0 - smoothstep(0.70, 1.0, y) * 0.45);',
+        '    vec3 lit = mix(uMid * 2.4 + uHor * 1.0, uSunCol * 1.35, 0.25 + 0.75 * pow(az, 4.0));',
+        '    col = mix(col, lit, c * alt * uCloudI);',
+        '  }',
+        '',
+        // 地平线以下：地气（远景地面会在这里接上），避免场地像一块浮板
+        '  if (y < 0.0) {',
+        '    col = mix(uHor, uLand, smoothstep(0.0, -0.45, y) * 0.85);',
+        '  }',
+        '',
+        '  gl_FragColor = vec4(max(col, vec3(0.0)), 1.0);',
+        '}',
+      ].join('\n'),
     });
     const sky = new THREE.Mesh(skyGeo, skyMat);
     sky.renderOrder = -10;
     sky.frustumCulled = false;
     scene.add(sky);
-
-    const dirs = [];
-    for (let i = 0; i < posAttr.count; i++) {
-      dirs.push(new THREE.Vector3(posAttr.getX(i), posAttr.getY(i), posAttr.getZ(i)).normalize());
-    }
-
-    const tmpA = new THREE.Color();
-    const tmpB = new THREE.Color();
-    const smooth = function (a, b, x) {
-      const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
-      return t * t * (3 - 2 * t);
-    };
 
     // 日/月圆盘：一张径向渐变的软圆片，贴在穹顶上朝向球心
     const discTex = (function () {
@@ -167,34 +249,35 @@ import { FL } from './fl.js';
       scene.add(cone);
     }
 
-    scene.fog = new THREE.FogExp2(0x070c13, 0.0016);
+    // 用线性雾而不是 FogExp2：指数雾在 400m 处就吃掉一半反差，整个场地都会被罩灰，
+    // 而场景本体只有 254m，需要的是"远处褪色"而不是"整体压灰"
+    scene.fog = new THREE.Fog(0x070c13, 260, 1800);
 
+    const U2 = skyMat.uniforms;
     const api = {
       mesh: sky,
-      dirs: dirs,
       stars: stars,
       coneMat: coneMat,
       mat: skyMat,
       sunDisc: sunDisc,
       moonDisc: moonDisc,
-      // 三色渐变 + 地平线方位辉光，逐顶点着色
+      // 三段竖直配色 + 地平线暖带；太阳方位由 setSun 喂进来的 uSun 决定
       setSky: function (top, mid, hor, glowCol, glowAz, glowI) {
-        for (let i = 0; i < dirs.length; i++) {
-          const d = dirs[i];
-          const y = d.y;
-          tmpA.copy(hor).lerp(mid, smooth(0.0, 0.075, y)).lerp(top, smooth(0.10, 0.55, y));
-          const gx = glowAz.x === undefined ? glowAz.r : glowAz.x;
-          const gz = glowAz.z === undefined ? glowAz.b : glowAz.z;
-          const az = Math.max(0, d.x * gx + d.z * gz);
-          const band = (1 - smooth(0.05, 0.42, y)) * smooth(-0.06, 0.02, y);
-          tmpB.copy(glowCol).multiplyScalar(Math.pow(az, 5) * band * glowI);
-          colors[i * 3] = tmpA.r + tmpB.r;
-          colors[i * 3 + 1] = tmpA.g + tmpB.g;
-          colors[i * 3 + 2] = tmpA.b + tmpB.b;
-        }
-        skyGeo.attributes.color.needsUpdate = true;
+        U2.uTop.value.copy(top);
+        U2.uMid.value.copy(mid);
+        U2.uHor.value.copy(hor);
+        if (glowCol) U2.uGlow.value.copy(glowCol);
+        U2.uGlowI.value = glowI == null ? 1 : glowI;
       },
+      // 地平线以下的地气颜色（白天是灰绿的远野，夜里接近全黑）
+      setLand: function (col) { U2.uLand.value.copy(col); },
+      // 云的密度：0 完全无云
+      setCloud: function (i) { U2.uCloudI.value = i; },
+      update: function (dt) { U2.uTime.value += dt; },
       setSun: function (dir, color, scale, opacity) {
+        U2.uSun.value.copy(dir).normalize();
+        if (color) U2.uSunCol.value.copy(color);
+        U2.uSunI.value = Math.min(1.4, Math.max(0, opacity));
         sunDisc.position.copy(dir).normalize().multiplyScalar(1120);
         sunDisc.lookAt(0, 0, 0);
         sunDisc.material.color.copy(color);

@@ -12,23 +12,31 @@ import { FL } from './fl.js';
     return t * t * (3 - 2 * t);
   };
   const C = (r, g, b) => new THREE.Color(r, g, b);
+  // 保亮度提饱和：颜色混到中间灰时把色相拉回来
+  const saturate = (c, k) => {
+    const l = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+    c.r = Math.max(0, l + (c.r - l) * k);
+    c.g = Math.max(0, l + (c.g - l) * k);
+    c.b = Math.max(0, l + (c.b - l) * k);
+    return c;
+  };
 
   /* 三套配色：深夜 / 晨昏 / 正午 */
   const P = {
     night: {
       top: C(0.004, 0.008, 0.016), mid: C(0.012, 0.020, 0.032), hor: C(0.028, 0.032, 0.038),
       glow: C(0.055, 0.045, 0.032), key: C(0xc9dbff), sky: C(0x5b7fa6), ground: C(0x1a231d),
-      fog: C(0x070c13), warm: C(0xffa06a),
+      fog: C(0x070c13), warm: C(0xffa06a), land: C(0.010, 0.013, 0.020), cloud: 0.10,
     },
     dusk: {
       top: C(0.030, 0.040, 0.090), mid: C(0.105, 0.070, 0.095), hor: C(0.62, 0.26, 0.10),
       glow: C(0.80, 0.30, 0.09), key: C(0xffb478), sky: C(0x6b6a90), ground: C(0x2c2119),
-      fog: C(0x241a1a), warm: C(0xff9a58),
+      fog: C(0x241a1a), warm: C(0xff9a58), land: C(0.140, 0.100, 0.086), cloud: 0.55,
     },
     day: {
       top: C(0.045, 0.150, 0.420), mid: C(0.115, 0.290, 0.620), hor: C(0.320, 0.500, 0.760),
       glow: C(0.20, 0.20, 0.20), key: C(0xfff2e0), sky: C(0x9fc6ea), ground: C(0x6d6a55),
-      fog: C(0x9db6c9), warm: C(0xfff0d8),
+      fog: C(0x9db6c9), warm: C(0xfff0d8), land: C(0.165, 0.215, 0.285), cloud: 0.30,
     },
   };
 
@@ -63,6 +71,7 @@ import { FL } from './fl.js';
     const cHor = new THREE.Color();
     const cGlow = new THREE.Color();
     const cSun = new THREE.Color();
+    const cFog = new THREE.Color();
     const cWhite = new THREE.Color(0xfff6ea);
     const cGold = new THREE.Color(0xff9a45);
     const dayKey = new THREE.Color();
@@ -74,6 +83,9 @@ import { FL } from './fl.js';
     function blend(night, dusk, day, nightF, dayF) {
       return tmp.copy(night).lerp(day, dayF).lerp(dusk, duskMix);
     }
+
+    // 夜里 → 晨昏 → 白天 的三段权重混合（nightF 与 duskMix 一起决定）
+    let mix3 = (n, d, y) => n;
 
     let lastHour = -999;
 
@@ -87,8 +99,11 @@ import { FL } from './fl.js';
       const s = Math.sin(Math.PI * u); // >0 表示太阳在地平线上
       const dayF = smooth(-0.02, 0.16, s);
       const nightF = 1 - smooth(-0.09, 0.005, s);
-      const duskF = clamp01(1 - Math.abs(s) / 0.24) * (1 - nightF * 0.7);
-      duskMix = clamp01(1 - Math.abs(s) / 0.42) * (1 - nightF);
+      // 太阳高度角 17° 时（18:20 前后）就该是金色了，原来 0.24 的窗口到这里已经衰减成 0，
+      // 画面就停在"白天蓝 + 一点粉"的灰调上
+      const duskF = clamp01(1 - Math.abs(s) / 0.30) * (1 - nightF * 0.7);
+      duskMix = clamp01(1 - Math.abs(s) / 0.60) * (1 - nightF);
+      mix3 = (n, d, y) => n * nightF + (d * duskMix + y * (1 - duskMix)) * (1 - nightF);
 
       /* ---- 太阳 / 月亮方位（天空与主光共用） ---- */
       const az = -0.30 + Math.PI * clamp01(u);
@@ -102,8 +117,19 @@ import { FL } from './fl.js';
         cMid.copy(blend(P.night.mid, P.dusk.mid, P.day.mid, nightF, dayF));
         cHor.copy(blend(P.night.hor, P.dusk.hor, P.day.hor, nightF, dayF));
         cGlow.copy(blend(P.night.glow, P.dusk.glow, P.day.glow, nightF, dayF));
+        // 蓝和橙在 RGB 里直接插值会经过灰色，18:20 前后这片天就是这么变成"灰粉"的。
+        // 过渡中段把饱和度补回来：两端不动，中点最猛。
+        const satK = 1 + 0.85 * (4 * duskMix * (1 - duskMix));
+        if (satK > 1.001) {
+          saturate(cMid, satK);
+          saturate(cHor, satK);
+          saturate(cGlow, satK * 1.05);
+        }
         azVec.set(Math.cos(az), 0, Math.sin(az));
         sky.setSky(cTop, cMid, cHor, cGlow, azVec, 1.0);
+        // 地平线以下的地气与云量：让场地边缘不再是一刀切进天空
+        if (sky.setLand) sky.setLand(blend(P.night.land, P.dusk.land, P.day.land, nightF, dayF));
+        if (sky.setCloud) sky.setCloud(P.night.cloud * nightF + P.dusk.cloud * duskMix + P.day.cloud * dayF * (1 - duskMix));
         if (sky.stars) {
           sky.stars.material.opacity = 0.55 * nightF;
           sky.stars.visible = nightF > 0.02;
@@ -119,22 +145,23 @@ import { FL } from './fl.js';
       // 太阳色温与强度分开随高度角走：低角度偏金偏弱，正午偏白偏强
       const hiF = smooth(0.10, 0.68, s);
       dayKey.copy(cGold).lerp(cWhite, hiF);
-      const dayI = 2.3 + 3.9 * hiF;
       if (sky && sky.setSun) {
         cSun.copy(dayKey);
         sky.setSun(sunPos, cSun, 1.0 + duskF * 0.5, clamp01(1 - nightF) * 0.85 + duskF * 0.15);
       }
       key.position.copy(sunPos).lerp(moonPos, nightF);
       key.color.copy(blend(P.night.key, P.dusk.key, dayKey, nightF, dayF));
-      key.intensity = 6.4 * nightF + (1 - nightF) * (dayI * dayF + 2.6 * duskF);
+      // 主光：正午 9.4 / 黄昏 5.4 / 夜 6.6（月光）
+      key.intensity = mix3(6.6, 5.4, 9.4);
 
       /* ---- 环境光 / 暖补光 / 侧补光 ---- */
       hemi.color.copy(blend(P.night.sky, P.dusk.sky, P.day.sky, nightF, dayF));
       hemi.groundColor.copy(blend(P.night.ground, P.dusk.ground, P.day.ground, nightF, dayF));
-      hemi.intensity = 2.1 * nightF + 2.2 * duskF + 2.05 * dayF;
+      // 环境光压到主光的 1/3 以下，阴影才有形状
+      hemi.intensity = mix3(2.0, 1.05, 1.15);
       warm.color.copy(blend(P.night.warm, P.dusk.warm, P.day.warm, nightF, dayF));
-      warm.intensity = 1.5 * nightF + 1.9 * duskF + 0.7 * dayF;
-      fill.intensity = 1.3 * nightF + 1.0 * duskF + 0.55 * dayF;
+      warm.intensity = mix3(1.4, 0.95, 0.42);
+      fill.intensity = mix3(1.2, 0.60, 0.34);
 
       /* ---- 场内灯具（白天基本关掉）---- */
       const lampF = 0.08 + 0.92 * nightF;
@@ -150,10 +177,14 @@ import { FL } from './fl.js';
 
       /* ---- 雾与曝光 ---- */
       if (scene.fog) {
-        scene.fog.color.copy(blend(P.night.fog, P.dusk.fog, P.day.fog, nightF, dayF));
-        scene.fog.density = 0.0016 * nightF + 0.0009 * duskF + 0.00045 * dayF;
+        // 雾色必须等于看向地平线时看到的颜色，否则远景和天空之间会有一条缝
+        cFog.copy(P.night.fog).lerp(cHor, 1 - nightF).lerp(cGlow, 0.22 * duskMix);
+        scene.fog.color.copy(cFog);
+        // 雾从 260m 之外才开始起作用，场地本体（254m）几乎不受影响
+        scene.fog.near = mix3(180, 240, 300);
+        scene.fog.far = mix3(1250, 1650, 2100);
       }
-      if (pipe && pipe.setExposure) pipe.setExposure(1.36 * nightF + 1.18 * duskF + 1.06 * dayF);
+      if (pipe && pipe.setExposure) pipe.setExposure(mix3(1.34, 1.06, 0.96));
 
       // 供 UI 判断时段
       return { night: nightF, dusk: duskF, day: dayF };

@@ -198,6 +198,7 @@ function boot() {
 
     const hour = hourAt(simTime);
     const phase = day.setHour(hour);
+    if (sky && sky.update) sky.update(fixed != null ? 0 : dt);
     for (let i = 0; i < world.pointLights.length; i++) {
       const pl = world.pointLights[i];
       const base = pl.userData.dayBase == null ? pl.userData.base : pl.userData.dayBase;
