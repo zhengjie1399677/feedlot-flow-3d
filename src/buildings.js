@@ -114,15 +114,15 @@ import { FL } from './fl.js';
     const z0 = cz - halfD, z1 = cz + halfD;
     if (door) {
       const dz0 = door.z0, dz1 = door.z1;
-      U.box(kit, M.wall, t, eave - y0, dz0 - z0, x, (eave + y0) / 2, (z0 + dz0) / 2);
-      U.box(kit, M.wall, t, eave - y0, z1 - dz1, x, (eave + y0) / 2, (dz1 + z1) / 2);
-      U.box(kit, M.wall, t, eave - (y0 + door.h), dz1 - dz0, x, (eave + y0 + door.h) / 2, (dz0 + dz1) / 2);
+      U.box(kit, M.barnWall, t, eave - y0, dz0 - z0, x, (eave + y0) / 2, (z0 + dz0) / 2);
+      U.box(kit, M.barnWall, t, eave - y0, z1 - dz1, x, (eave + y0) / 2, (dz1 + z1) / 2);
+      U.box(kit, M.barnWall, t, eave - (y0 + door.h), dz1 - dz0, x, (eave + y0 + door.h) / 2, (dz0 + dz1) / 2);
       // 门框
       U.box(kit, M.timber, t + 0.16, 0.34, dz1 - dz0 + 0.5, x, y0 + door.h + 0.1, cz);
       U.box(kit, M.timber, t + 0.16, door.h, 0.28, x, y0 + door.h / 2, dz0 - 0.12);
       U.box(kit, M.timber, t + 0.16, door.h, 0.28, x, y0 + door.h / 2, dz1 + 0.12);
     } else {
-      U.box(kit, M.wall, t, eave - y0, 2 * halfD, x, (eave + y0) / 2, cz);
+      U.box(kit, M.barnWall, t, eave - y0, 2 * halfD, x, (eave + y0) / 2, cz);
     }
     // 山墙三角
     const rise = ridge - eave;
@@ -134,7 +134,7 @@ import { FL } from './fl.js';
     const g = new THREE.ExtrudeGeometry(shape, { depth: t, bevelEnabled: false, steps: 1 });
     g.translate(0, 0, -t / 2);
     g.applyMatrix4(U.mat4(x, eave, cz, 0, Math.PI / 2, 0));
-    kit.add(g, M.wall);
+    kit.add(g, M.barnWall);
     // 山墙木饰条
     U.box(kit, M.timber, t + 0.1, 0.22, 2 * halfD, x, eave - 0.08, cz);
   }
@@ -164,7 +164,7 @@ import { FL } from './fl.js';
     const halfL = len / 2, halfD = dep / 2;
     const zf = cz + halfD, zb = cz - halfD;
     const eave = 6.5, ridge = 10.1;
-    const roofMat = mir ? M.roofSouth : M.roof;
+    const roofMat = mir ? M.barnRoofSouth : M.barnRoof;
     const y0 = 0.42;
     const doorW = 6.2, doorH = 4.9;
     const doorZ = cz - 3.2;
@@ -173,7 +173,7 @@ import { FL } from './fl.js';
     U.box(kit, M.floor, len - 0.7, 0.5, dep - 0.7, cx, 0.55, cz, 0, 0, 0, 0.04);
 
     // 背墙
-    U.box(kit, M.wall, len, eave - y0, 0.3, cx, (eave + y0) / 2, zb + 0.15);
+    U.box(kit, M.barnWall, len, eave - y0, 0.3, cx, (eave + y0) / 2, zb + 0.15);
     // 背墙立面：勒脚、高位通风格栅、雨水管（南排这面正对园区）
     U.box(kit, M.apronEdge, len + 0.3, 0.9, 0.36, cx, 0.86, zb - 0.06);
     U.box(kit, M.timber, len + 0.2, 0.14, 0.3, cx, 1.36, zb - 0.06);
@@ -231,7 +231,7 @@ import { FL } from './fl.js';
     U.box(kit, M.warmGlow, len - 2, 0.06, 0.1, cx, eave - 0.35, zf + 0.18, 0, 0, 0);
 
     // 前墙踢脚 + 颈夹
-    U.box(kit, M.wall, len - 1.4, 1.0, 0.32, cx, y0 + 0.5, zf + 0.02);
+    U.box(kit, M.barnWall, len - 1.4, 1.0, 0.32, cx, y0 + 0.5, zf + 0.02);
     U.box(kit, M.timber, len - 1.0, 0.12, 0.4, cx, y0 + 1.02, zf + 0.02);
     for (let i = 0; i <= 22; i++) {
       const x = cx - halfL + 1.0 + (i * (len - 2)) / 22;
@@ -405,8 +405,8 @@ import { FL } from './fl.js';
     U.box(kit, M.steel, 0.5, 0.55, 21.4, g.x - 0.5, 7.0, g.z);
     U.box(kit, M.steel, 0.35, 2.6, 0.35, g.x - 0.5, 8.2, g.z - 9.5);
     U.box(kit, M.steel, 0.35, 2.6, 0.35, g.x - 0.5, 8.2, g.z + 9.5);
-    sign(world, '牧野牧业 · 育肥一场', 'MUYE FEEDLOT · UNIT 01', 13.5, 2.3, g.x + 0.35, 9.0, g.z, Math.PI / 2,
-      { size: 86, subSize: 36, bg: 'rgba(10,13,16,0.94)', border: 'rgba(255,196,120,0.4)', glow: 'rgba(255,180,90,0.5)', color: '#ffe4bd' });
+    sign(world, '草都草牧业 · 育肥一场', 'CAODU GRASS & LIVESTOCK · UNIT 01', 13.5, 2.3, g.x + 0.35, 9.0, g.z, Math.PI / 2,
+      { size: 82, subSize: 32, bg: 'rgba(10,13,16,0.94)', border: 'rgba(255,196,120,0.4)', glow: 'rgba(255,180,90,0.5)', color: '#ffe4bd' });
     glowPlane(world, 13.5, 2.6, g.x + 0.5, 9.0, g.z, Math.PI / 2, new THREE.Color(1.4, 0.8, 0.35), 0.12);
 
     // 道闸：立柱固定，横杆做成独立组（车辆通过时抬起 → 见 main.js）
@@ -499,9 +499,9 @@ import { FL } from './fl.js';
     }
     // 锥斗
     const cone = new THREE.CylinderGeometry(r - 0.12, 1.05, 3.4, 20, 1, true);
-    kit.add(cone, M.galv, U.mat4(x, 6.9, z));
+    kit.add(cone, M.tmrWhite, U.mat4(x, 6.9, z));
     // 筒身
-    U.cyl(kit, M.galv, r, r, h - 8.6, 24, x, 8.6 + (h - 8.6) / 2, z);
+    U.cyl(kit, M.tmrWhite, r, r, h - 8.6, 24, x, 8.6 + (h - 8.6) / 2, z);
     // 加强环
     for (let i = 1; i < 7; i++) {
       const y = 8.6 + (i * (h - 8.6)) / 7;
@@ -510,7 +510,7 @@ import { FL } from './fl.js';
     }
     // 顶
     const top = new THREE.ConeGeometry(r, 2.4, 24);
-    kit.add(top, M.galv, U.mat4(x, h + 1.2, z));
+    kit.add(top, M.tmrWhite, U.mat4(x, h + 1.2, z));
     U.cyl(kit, M.steel, 0.5, 0.5, 0.8, 10, x, h + 2.5, z);
     // 爬梯
     U.box(kit, M.steel, 0.12, h - 4, 0.5, x + r + 0.08, 4 + (h - 4) / 2, z);
@@ -606,9 +606,9 @@ import { FL } from './fl.js';
     // ── 成品日粮仓（两只立式料仓，贴着车间北墙）──
     for (const bx2 of [cx - 8.5, cx - 3.2]) {
       const bh = 13.5, br = 2.6, bz2 = cz - d / 2 - 3.2;
-      U.cyl(kit, M.galv, br, br, bh, 18, bx2, bh / 2 + 1.2, bz2);
+      U.cyl(kit, M.tmrWhite, br, br, bh, 18, bx2, bh / 2 + 1.2, bz2);
       const cone = new THREE.ConeGeometry(br, 2.6, 18);
-      kit.add(cone, M.galv, U.mat4(bx2, 1.0, bz2, Math.PI, 0, 0));
+      kit.add(cone, M.tmrWhite, U.mat4(bx2, 1.0, bz2, Math.PI, 0, 0));
       U.cyl(kit, M.steelLight, br * 0.55, br * 0.55, 0.5, 14, bx2, bh + 1.5, bz2);
       for (let r = 0; r < 3; r++) {
         U.cyl(kit, M.steel, br + 0.06, br + 0.06, 0.16, 18, bx2, 4.2 + r * 3.6, bz2);
@@ -1142,8 +1142,8 @@ import { FL } from './fl.js';
     }
     world.pools.push({ x: cx, z: pavZ + pavD / 2 + 6.3, size: 28, warm: 1 });
     // 塔楼顶的楼名
-    sign(world, '牧野牧业', 'MUYE CATTLE · 员工办公楼', 17, 2.8, cx, 21.4, pavZ + pavD / 2 + 0.3, 0, {
-      size: 96, subSize: 34, bg: 'rgba(9,12,15,0.94)', border: 'rgba(150,205,255,0.46)',
+    sign(world, '草都草牧业股份有限公司', 'CAODU GRASS ANIMAL HUSBANDRY CO., LTD.', 17, 2.8, cx, 21.4, pavZ + pavD / 2 + 0.3, 0, {
+      size: 78, subSize: 28, bg: 'rgba(9,12,15,0.94)', border: 'rgba(150,205,255,0.46)',
       glow: 'rgba(120,180,255,0.3)', color: '#e6f1ff', subColor: 'rgba(175,205,235,0.82)',
     });
 

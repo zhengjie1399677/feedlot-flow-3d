@@ -100,12 +100,17 @@ function boot() {
     sky = FL.createSky(scene, world);
     fleet = FL.buildFleet(scene);
     if (FL.buildHerd) herd = FL.buildHerd(scene, FL.herdSpots(FL.LAYOUT || window.LAYOUT || {}));
-    rig = FL.createCameraRig(camera, canvas);
+    rig = FL.createCameraRig(camera, canvas, fleet);
     const camId = q.get('cam');
     const known = rig.presets && rig.presets.some(function (p) { return p.id === camId; });
     rig.goPreset(known ? camId : 'overview', true);
     const pan = (q.get('pan') || '').split(',').map(Number);
     if (pan.length === 2 && isFinite(pan[0]) && isFinite(pan[1])) rig.panTo(pan[0], pan[1], true);
+    // 第一人称跟车：?ride=tmr / ?ride=cattle / ?ride=1（默认 TMR 日粮车）
+    if (q.has('ride')) {
+      const rp = q.get('ride');
+      rig.enterRide(rp === '' || rp === '1' || rp === 'true' ? 'tmr' : rp, true);
+    }
     pipe = FL.createPipeline(renderer, { enabled: fxOn });
     day = FL.createDay(scene, world, sky, pipe);
     // ui=0（纯画面对照图）时也要撤掉加载遮罩，否则永远停在 LOADING FEEDLOT

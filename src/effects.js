@@ -385,12 +385,15 @@ import { FL } from './fl.js';
   };
 
   /* ---------------- 相机 ---------------- */
-  FL.createCameraRig = function (camera, dom) {
+  FL.createCameraRig = function (camera, dom, fleet) {
     const presets = L.cameras;
     const base = 336;
+    const orbitFov = camera.fov;
+    const orbitNear = camera.near;
     const state = {
       theta: 0.62, phi: 0.98, dist: base, target: new THREE.Vector3(-4, 0, -10),
     };
+    let currentPreset = 'overview';
     const goal = {
       theta: state.theta, phi: state.phi, dist: state.dist, target: state.target.clone(),
     };
@@ -404,6 +407,144 @@ import { FL } from './fl.js';
     let interacting = false;
     let lastInteract = -1e9;
     const keys = new Set();
+
+    /* ---------------- 第一人称跟车（驾驶室平视） ---------------- */
+    const RIDE_CFG = {
+      cattle: { label: '活牛车', en: 'CATTLE HAULER', eye: [0, 2.68, 5.55], fov: 58 },
+      forage: { label: '草料车', en: 'FORAGE TRUCK', eye: [0, 2.68, 5.6], fov: 58 },
+      tmr: { label: 'TMR 日粮车', en: 'TMR MIXER', eye: [0, 2.7, 5.65], fov: 58 },
+      out: { label: '出栏车', en: 'OUTBOUND TRUCK', eye: [0, 2.68, 5.55], fov: 58 },
+    };
+    const rideList = [];
+    if (fleet && fleet.list) {
+      for (const v of fleet.list) {
+        const cfg = RIDE_CFG[v.id] || { label: v.id, en: 'VEHICLE', eye: [0, 2.68, 5.5], fov: 58 };
+        rideList.push({ id: v.id, label: cfg.label, en: cfg.en, veh: v, cfg: cfg });
+      }
+    }
+    const ride = {
+      active: false, item: null,
+      yaw: 0, goalYaw: 0, pitch: 0, goalPitch: 0,
+      fov: orbitFov, goalFov: orbitFov, blend: 1,
+      startPos: new THREE.Vector3(), startQuat: new THREE.Quaternion(),
+    };
+    let onRideChange = null;
+    // 用一台虚拟相机求朝向：Object3D.lookAt 朝向 +Z，相机 lookAt 朝向 -Z
+    const lookHelper = new THREE.PerspectiveCamera();
+    const _ridePos = new THREE.Vector3();
+    const _rideDir = new THREE.Vector3();
+    const clampFov = (v) => Math.max(42, Math.min(72, v));
+    const clampLook = (v) => Math.max(-2.75, Math.min(2.75, v));
+    const clampPitch = (v) => Math.max(-0.62, Math.min(0.55, v));
+
+    function pickRide(id) {
+      if (!rideList.length) return null;
+      if (id) {
+        for (const it of rideList) if (it.id === id) return it;
+      }
+      for (const it of rideList) if (it.id === 'tmr') return it;
+      return rideList[0];
+    }
+    function emitRide() {
+      if (onRideChange) onRideChange(ride.active, ride.item ? ride.item.id : null);
+    }
+    function rideTransform(outPos, outDir) {
+      if (!ride.item) return false;
+      const veh = ride.item.veh;
+      const eye = ride.item.cfg.eye;
+      // 车辆朝向：局部 +Z 指向行驶方向；只取水平朝向，驾驶室里的视角不受车身俯仰影响
+      const yaw = Math.atan2(veh.hx, veh.hz);
+      const c = Math.cos(yaw), s = Math.sin(yaw);
+      const bob = Math.sin(performance.now() * 0.0071 + (veh.phase || 0)) * 0.015 * Math.min(1, (veh.v || 0) / 6);
+      outPos.set(
+        veh.x + eye[0] * c + eye[2] * s,
+        veh.group.position.y + eye[1] + bob,
+        veh.z - eye[0] * s + eye[2] * c
+      );
+      const ry = yaw + ride.yaw;
+      const cp = Math.cos(ride.pitch);
+      outDir.set(Math.sin(ry) * cp, Math.sin(ride.pitch), Math.cos(ry) * cp);
+      return true;
+    }
+    function updateRide(dt) {
+      if (!ride.active || !ride.item) return;
+      const k = 1 - Math.exp(-dt * 9);
+      ride.yaw += (ride.goalYaw - ride.yaw) * k;
+      ride.pitch += (ride.goalPitch - ride.pitch) * k;
+      ride.fov += (ride.goalFov - ride.fov) * (1 - Math.exp(-dt * 7));
+      if (Math.abs(camera.fov - ride.fov) > 0.01) {
+        camera.fov = ride.fov;
+        camera.updateProjectionMatrix();
+      }
+      if (!rideTransform(_ridePos, _rideDir)) return;
+      lookHelper.position.copy(_ridePos);
+      lookHelper.lookAt(
+        _ridePos.x + _rideDir.x * 80,
+        _ridePos.y + _rideDir.y * 80,
+        _ridePos.z + _rideDir.z * 80
+      );
+      if (ride.blend < 1) {
+        ride.blend = Math.min(1, ride.blend + dt / 0.9);
+        const e = 1 - Math.pow(1 - ride.blend, 3);
+        camera.position.lerpVectors(ride.startPos, _ridePos, e);
+        camera.quaternion.copy(ride.startQuat).slerp(lookHelper.quaternion, e);
+      } else {
+        camera.position.copy(_ridePos);
+        camera.quaternion.copy(lookHelper.quaternion);
+      }
+    }
+    function enterRide(id, instant) {
+      const item = pickRide(id);
+      if (!item) return false;
+      const was = ride.active;
+      ride.startPos.copy(camera.position);
+      ride.startQuat.copy(camera.quaternion);
+      ride.blend = instant ? 1 : 0;
+      ride.active = true;
+      ride.item = item;
+      ride.yaw = ride.goalYaw = 0;
+      ride.pitch = ride.goalPitch = 0;
+      ride.goalFov = item.cfg.fov;
+      ride.fov = instant ? item.cfg.fov : camera.fov;
+      camera.near = was ? camera.near : Math.min(orbitNear, 1.2);
+      if (instant) {
+        camera.fov = item.cfg.fov;
+        camera.near = Math.min(orbitNear, 1.2);
+        camera.updateProjectionMatrix();
+        updateRide(0);
+      }
+      lastInteract = performance.now();
+      emitRide();
+      return true;
+    }
+    function exitRide() {
+      if (!ride.active) return false;
+      ride.active = false;
+      ride.item = null;
+      ride.blend = 1;
+      camera.fov = orbitFov;
+      camera.near = orbitNear;
+      camera.updateProjectionMatrix();
+      place();
+      lastInteract = performance.now();
+      emitRide();
+      return true;
+    }
+    function setRideVehicle(id) {
+      if (!ride.active) return enterRide(id);
+      const item = pickRide(id);
+      if (!item) return false;
+      return enterRide(item.id);
+    }
+    function cycleRide(dir) {
+      if (!ride.active || rideList.length < 2) return false;
+      let i = ride.item ? rideList.indexOf(ride.item) : -1;
+      i = (i + (dir < 0 ? -1 : 1) + rideList.length) % rideList.length;
+      return enterRide(rideList[i].id);
+    }
+    function toggleRide() {
+      return ride.active ? exitRide() : enterRide(null);
+    }
 
     const clampPhi = (v) => Math.max(0.36, Math.min(1.2, v));
     const clampDist = (v) => Math.max(base / 7, Math.min(base * 1.75, v));
@@ -446,8 +587,8 @@ import { FL } from './fl.js';
       dom.setPointerCapture && dom.setPointerCapture(e.pointerId);
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (pointers.size === 1) {
-        // 右键 / 中键 / Shift + 拖拽 = 平移，否则旋转
-        panning = e.button === 2 || e.button === 1 || e.shiftKey || e.altKey;
+        // 右键 / 中键 / Shift + 拖拽 = 平移，否则旋转；跟车时一律环视
+        panning = !ride.active && (e.button === 2 || e.button === 1 || e.shiftKey || e.altKey);
         dragging = !panning;
         lastX = e.clientX;
         lastY = e.clientY;
@@ -466,6 +607,12 @@ import { FL } from './fl.js';
       if (pointers.size === 2) {
         const p = Array.from(pointers.values());
         const d = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
+        if (ride.active) {
+          if (pinchDist > 0) ride.goalFov = clampFov(ride.goalFov * (pinchDist / Math.max(1, d)));
+          pinchDist = d;
+          lastInteract = performance.now();
+          return;
+        }
         if (pinchDist > 0) {
           goal.dist = clampDist(goal.dist * (pinchDist / Math.max(1, d)));
         }
@@ -480,6 +627,12 @@ import { FL } from './fl.js';
       const dy = e.clientY - lastY;
       lastX = e.clientX;
       lastY = e.clientY;
+      if (ride.active) {
+        ride.goalYaw = clampLook(ride.goalYaw - dx * 0.003);
+        ride.goalPitch = clampPitch(ride.goalPitch - dy * 0.0024);
+        lastInteract = performance.now();
+        return;
+      }
       if (panning) { panScreen(dx, dy); return; }
       vTheta = -dx * 0.0034;
       vPhi = -dy * 0.0028;
@@ -500,7 +653,11 @@ import { FL } from './fl.js';
     }
     function onWheel(e) {
       e.preventDefault();
-      goal.dist = clampDist(goal.dist * Math.pow(1.0016, e.deltaY));
+      if (ride.active) {
+        ride.goalFov = clampFov(ride.goalFov + e.deltaY * 0.02);
+      } else {
+        goal.dist = clampDist(goal.dist * Math.pow(1.0016, e.deltaY));
+      }
       lastInteract = performance.now();
     }
 
@@ -509,14 +666,23 @@ import { FL } from './fl.js';
     window.addEventListener('pointerup', onUp);
     window.addEventListener('pointercancel', onUp);
     dom.addEventListener('wheel', onWheel, { passive: false });
-    dom.addEventListener('dblclick', () => rig.goPreset('overview', true));
+    dom.addEventListener('dblclick', () => {
+      if (ride.active) {
+        ride.goalYaw = 0;
+        ride.goalPitch = 0;
+      } else {
+        rig.goPreset('overview', true);
+      }
+    });
     dom.addEventListener('contextmenu', (e) => e.preventDefault());
 
     const rig = {
       presets: presets,
       state: state,
       goPreset: function (id, instant) {
+        if (ride.active) exitRide();
         const p = presets.find((x) => x.id === id) || presets[0];
+        currentPreset = p.id;
         goal.theta = p.theta;
         goal.phi = p.phi;
         goal.dist = base / p.zoom;
@@ -537,6 +703,10 @@ import { FL } from './fl.js';
         lastInteract = performance.now();
       },
       update: function (dt) {
+        if (ride.active) {
+          updateRide(dt);
+          return;
+        }
         if (keys.size) {
           let du = 0, dv = 0;
           if (keys.has('l')) du -= 1;
@@ -562,11 +732,48 @@ import { FL } from './fl.js';
         place();
       },
       get zoom() { return base / state.dist; },
-      get dist() { return state.dist; },
+      get dist() { return ride.active ? 18 : state.dist; },
+      get currentPreset() { return currentPreset; },
+      /* 第一人称跟车 */
+      enterRide: enterRide,
+      exitRide: exitRide,
+      toggleRide: toggleRide,
+      setRideVehicle: setRideVehicle,
+      cycleRide: cycleRide,
+      onRideChange: function (fn) {
+        onRideChange = fn;
+        if (fn) fn(ride.active, ride.item ? ride.item.id : null);
+      },
+      get isRiding() { return ride.active; },
+      get rideId() { return ride.item ? ride.item.id : null; },
+      get rideVehicles() {
+        return rideList.map(function (it) { return { id: it.id, label: it.label, en: it.en }; });
+      },
     };
     const PAN_KEYS = { arrowleft: 'l', a: 'l', arrowright: 'r', d: 'r', arrowup: 'u', w: 'u', arrowdown: 'd', s: 'd' };
     window.addEventListener('keydown', (e) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
       const k = e.key.toLowerCase();
+      if (ride.active) {
+        if (k === 'c' || k === 'escape') { exitRide(); e.preventDefault(); return; }
+        const rn = parseInt(e.key, 10);
+        if (rn >= 1 && rn <= rideList.length) {
+          setRideVehicle(rideList[rn - 1].id);
+          e.preventDefault();
+          return;
+        }
+        if (k === 'arrowleft' || k === 'arrowright') {
+          cycleRide(k === 'arrowleft' ? -1 : 1);
+          e.preventDefault();
+          return;
+        }
+        return;  // 跟车时不叠加轨道的平移/预设键
+      }
+      if (k === 'c' && rideList.length) {
+        enterRide(null);
+        e.preventDefault();
+        return;
+      }
       if (PAN_KEYS[k]) { keys.add(PAN_KEYS[k]); e.preventDefault(); return; }
       const n = parseInt(e.key, 10);
       if (n >= 1 && n <= presets.length) rig.goPreset(presets[n - 1].id);

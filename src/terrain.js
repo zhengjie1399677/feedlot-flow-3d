@@ -3,7 +3,7 @@ import { FL } from './fl.js';
 
 /* ============================================================
  *  terrain.js — 场地之外的地形
- *  内蒙古土默川平原（呼市近郊）秋天的农区：条田 + 农田防护林 +
+ *  园区外 620m 草甸 + 土默川秋收农田远景：草甸 / 条田 + 农田防护林 +
  *  村庄 + 进场道路延伸。全部程序化，无外部素材。
  *  坐标：-z 为北，+x 为东（与 layout.js 一致）。
  * ============================================================ */
@@ -23,6 +23,17 @@ import { FL } from './fl.js';
   ];
   const TRACK = '#928c76';
   const TREELINE = ['#333d24', '#3b462a', '#2c351f'];
+
+  // 园区外围的草甸：先铺一层低对比的草绿，再叠割草带和自然斑块。
+  // 半径 620m，400m 内是实的，往外软过渡到原来的农田，避免整片地面变成
+  // 一张纯绿色桌面，也让远处还保留土默川的田块和林带层次。
+  const MEADOW = {
+    base: '#73875a',
+    shades: ['#667a4f', '#7d9064', '#5c7047', '#85976d', '#6b8054', '#70855d'],
+    dry: '#8b8764',
+    radius: 620,
+    fade: 400,
+  };
 
   /* ---------------- 贴图 ---------------- */
   function paintFields(S, span, seed) {
@@ -115,6 +126,9 @@ import { FL } from './fl.js';
     for (let i = 0; i < blocksX.length; i++) treeRow(blocksX[i], 0, blocksX[i], S);
     for (let i = 0; i < blocksY.length; i++) treeRow(0, blocksY[i], S, blocksY[i]);
 
+    // 场区外围的草甸：盖住近处的条田，只留远处的农田
+    paintMeadow(ctx, S, span, 5150);
+
     // 地面噪点
     for (let i = 0; i < 26000; i++) {
       const a = 0.05 + rand() * 0.14;
@@ -171,6 +185,73 @@ import { FL } from './fl.js';
     ctx.globalCompositeOperation = 'source-over';
 
     return { canvas: c, m2px: m2px };
+  }
+
+  /* ---------------- 场区外围的草甸 ---------------- */
+  function paintMeadow(ctx, S, span, seed) {
+    const c = U.makeCanvas(S);
+    const g = c.getContext('2d');
+    const rand = U.rng(seed);
+    const W = (m) => (m * S) / span;
+
+    // 草地底色 + 大块深浅斑，避免均匀的“绿桌面”
+    g.fillStyle = MEADOW.base;
+    g.fillRect(0, 0, S, S);
+    for (let i = 0; i < 110; i++) {
+      const x = S * (0.5 + (rand() - 0.5) * 0.98);
+      const y = S * (0.5 + (rand() - 0.5) * 0.98);
+      g.globalAlpha = 0.08 + rand() * 0.16;
+      g.fillStyle = MEADOW.shades[(rand() * MEADOW.shades.length) | 0];
+      g.beginPath();
+      g.ellipse(x, y, W(70 + rand() * 240), W(50 + rand() * 180), rand() * Math.PI, 0, Math.PI * 2);
+      g.fill();
+    }
+
+    // 小片干草，给绿色里留一点土默川的暖调
+    for (let i = 0; i < 34; i++) {
+      const x = S * (0.5 + (rand() - 0.5) * 0.92);
+      const y = S * (0.5 + (rand() - 0.5) * 0.92);
+      g.globalAlpha = 0.05 + rand() * 0.08;
+      g.fillStyle = MEADOW.dry;
+      g.beginPath();
+      g.ellipse(x, y, W(35 + rand() * 150), W(25 + rand() * 100), rand() * Math.PI, 0, Math.PI * 2);
+      g.fill();
+    }
+
+    // 割草带：大尺度、低对比的斜向条纹，只在近处能读出来
+    g.save();
+    g.translate(S / 2, S / 2);
+    g.rotate(-0.18);
+    for (let x = -S; x < S;) {
+      const w = W(38 + rand() * 52);
+      g.globalAlpha = 1;
+      g.fillStyle = rand() > 0.5 ? 'rgba(240,246,224,0.035)' : 'rgba(18,32,20,0.045)';
+      g.fillRect(x, -S, w, S * 2);
+      x += w;
+    }
+    g.restore();
+
+    // 细碎草屑
+    for (let i = 0; i < 12000; i++) {
+      const a = 0.04 + rand() * 0.1;
+      g.globalAlpha = 1;
+      g.fillStyle = rand() > 0.48 ? 'rgba(25,38,18,' + a + ')' : 'rgba(222,230,196,' + a + ')';
+      const s = 1 + rand() * 2;
+      g.fillRect(rand() * S, rand() * S, s, s);
+    }
+
+    // 软边遮罩：中心实、620m 外渐隐，交给原来的农田
+    const cx = S / 2, cy = S / 2;
+    const mask = g.createRadialGradient(cx, cy, W(MEADOW.fade), cx, cy, W(MEADOW.radius));
+    mask.addColorStop(0, 'rgba(0,0,0,1)');
+    mask.addColorStop(0.55, 'rgba(0,0,0,1)');
+    mask.addColorStop(1, 'rgba(0,0,0,0)');
+    g.globalCompositeOperation = 'destination-in';
+    g.fillStyle = mask;
+    g.fillRect(0, 0, S, S);
+    g.globalCompositeOperation = 'source-over';
+
+    ctx.drawImage(c, 0, 0);
   }
 
   // 把世界坐标画到贴图上
@@ -269,8 +350,8 @@ import { FL } from './fl.js';
     const rand = U.rng(77123);
 
     const mats = {
-      ground: new THREE.MeshStandardMaterial({ color: 0xb2ae9e, roughness: 1, metalness: 0, transparent: true, depthWrite: true }),
-      far: new THREE.MeshStandardMaterial({ color: 0x8a8064, roughness: 1, metalness: 0 }),
+      ground: new THREE.MeshStandardMaterial({ color: 0xbfc0a8, roughness: 1, metalness: 0, transparent: true, depthWrite: true }),
+      far: new THREE.MeshStandardMaterial({ color: 0x7b8168, roughness: 1, metalness: 0 }),
       bark: new THREE.MeshStandardMaterial({ color: 0x5a5142, roughness: 1 }),
       leaf: new THREE.MeshStandardMaterial({ color: 0x4b5734, roughness: 1 }),
       brick: new THREE.MeshStandardMaterial({ color: 0x70503f, roughness: 0.95 }),
@@ -288,7 +369,7 @@ import { FL } from './fl.js';
 
     // ---- 远场兜底：同一张田块图平铺 + 雾，负责在地平线附近吃成全雾色 ----
     const farGeo = new THREE.PlaneGeometry(FAR, FAR, 1, 1);
-    mats.far.color.setHex(0x7e7d70);
+    mats.far.color.setHex(0x7b8168);
     const farMesh = new THREE.Mesh(farGeo, mats.far);
     farMesh.rotation.x = -Math.PI / 2;
     farMesh.position.y = Y_FAR;

@@ -26,6 +26,27 @@
         ],
         "createdAt": 1793537082821,
         "updatedAt": 1793537082821
+      },
+      "a662ca24-bc72-4ee9-89d7-8e95be0b3074": {
+        "namespace": "project",
+        "status": "approved",
+        "injected": false,
+        "source": "agent",
+        "content": "feedlot-flow-3d（育肥场 3D）的观感瓶颈不在材质和技术栈，在**形状与细节密度**：用户明确说过「你说的材质即便补全了应该也只是看着更真实，但原本素材的形状没办法更改」。后续优化优先改体量/差异化/细节件（六栋牛舍参数只有 cx 和 mirror，一模一样；单体缺立柱、勒脚、檐口、雨落管），而不是继续堆贴图。已接入的 CC0 素材：Poly Haven Qwantani 四时段 HDRI（scene.environment，强度 0.035–0.10）、ambientCG 四套 PBR（albedo 需去色，色相交给材质 color）、Kenney Car Kit 车模（colormap 降饱和到 32%）。办公楼/交易中心这类中国场区建筑在 CC0 库里没有对应物（Poly Haven 只有工业厂房/公寓立面模块），只能自己生成。",
+        "keywords": [
+          "feedlot-flow-3d",
+          "育肥场",
+          "3d 美术",
+          "材质",
+          "形状",
+          "牛舍",
+          "hdri",
+          "ambientcg",
+          "kenney",
+          "素材"
+        ],
+        "createdAt": 1793541961998,
+        "updatedAt": 1793541961998
       }
     }
   }

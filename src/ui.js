@@ -82,10 +82,65 @@ import { FL } from './fl.js';
       if (e.key === 'r' || e.key === 'R') applyCut(!cutState.on);
     });
 
+    /* 第一人称跟车：按钮 / HUD / 与相机状态同步 */
+    const viewsWrap = viewsEl.parentNode;
+    const rideBtn = document.createElement('button');
+    rideBtn.type = 'button';
+    rideBtn.className = 'ride-launch';
+    rideBtn.title = '坐进驾驶室，跟着一辆车平视看园区（快捷键 C）';
+    rideBtn.innerHTML = '<span class="k">C</span><span class="txt">跟车视角</span><span class="en">RIDE</span>';
+    viewsWrap.appendChild(rideBtn);
+
+    const rideHud = document.getElementById('ride-hud');
+    const rideNameEl = document.getElementById('ride-name');
+    const rideTabsEl = document.getElementById('ride-tabs');
+    const rideExitEl = document.getElementById('ride-exit');
+    const rideVehicles = rig.rideVehicles || [];
+    const RIDE_SHORT = { cattle: '活牛', forage: '草料', tmr: 'TMR', out: '出栏' };
+    const tabEls = new Map();
+    let activeView = rig.currentPreset || 'overview';
+
+    rideVehicles.forEach(function (v, i) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.title = '换到' + v.label + '（快捷键 ' + (i + 1) + ' / ←→）';
+      b.innerHTML = '<span class="k">' + (i + 1) + '</span><span></span>';
+      b.querySelector('span:last-child').textContent = RIDE_SHORT[v.id] || v.label;
+      b.addEventListener('click', function () { rig.setRideVehicle(v.id); });
+      if (rideTabsEl) rideTabsEl.appendChild(b);
+      tabEls.set(v.id, b);
+    });
+
+    if (!rideVehicles.length) {
+      rideBtn.style.display = 'none';
+      if (rideHud) rideHud.style.display = 'none';
+    }
+    rideBtn.addEventListener('click', function () { rig.toggleRide(); });
+    if (rideExitEl) rideExitEl.addEventListener('click', function () { rig.exitRide(); });
+
+    function syncRide(active, id) {
+      document.body.classList.toggle('ride', !!active);
+      rideBtn.classList.toggle('on', !!active);
+      const txt = rideBtn.querySelector('.txt');
+      if (txt) txt.textContent = active ? '退出跟车' : '跟车视角';
+      rideBtn.setAttribute('aria-pressed', active ? 'true' : 'false');
+      for (const [key, el] of tabEls) el.classList.toggle('on', !!active && key === id);
+      const item = rideVehicles.find(function (v) { return v.id === id; });
+      if (rideNameEl) rideNameEl.textContent = active && item ? item.label + ' · ' + item.en : '—';
+      if (active) {
+        for (const [, el] of viewEls) el.classList.remove('on');
+      } else {
+        // 退出跟车时恢复进入前的轨道视角；若退出时点了预设，activeView 已经是新预设
+        setActiveView(activeView);
+      }
+    }
+    rig.onRideChange(syncRide);
+
     function setActiveView(id) {
+      activeView = id;
       for (const [key, el] of viewEls) el.classList.toggle('on', key === id);
     }
-    setActiveView('overview');
+    if (!rig.isRiding) setActiveView(rig.currentPreset || 'overview');
 
     // 所有视角切换（按钮 / 数字键 / 双击）都经过这里，统一高亮
     const goPreset = rig.goPreset.bind(rig);

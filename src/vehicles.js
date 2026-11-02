@@ -199,7 +199,7 @@ import { FL } from './fl.js';
     const kit = new U.Kit();
     const m = materials(P);
     const wheels = [];
-    const mix = U.std({ color: 0xd9dcd4, roughness: 0.35, metalness: 0.55 });
+    const mix = U.std({ color: 0xf0f1ea, roughness: 0.38, metalness: 0.22 });
     // 拖拉机底盘
     box(kit, m.dark, 1.5, 0.34, 8.6, 0, 1.0, 0);
     // 后车架（罐体支撑）

@@ -172,6 +172,10 @@ import { FL } from './fl.js';
     M.wallDark = PBR('CorrugatedSteel009', 0x748388, 0.62, 0.35, 2.4);
     M.roof = PBR('CorrugatedSteel009', 0x7a5447, 0.62, 0.3, 2.4);
     M.roofSouth = PBR('CorrugatedSteel009', 0x6c4740, 0.64, 0.28, 2.4);
+    // 牛舍专用蓝：墙 / 北排屋面 / 南排屋面（与其它建筑共用材质分开，避免整场变蓝）
+    M.barnWall = PBR('PaintedPlaster017', 0x7ba0bc, 0.86, 0.03, 4);
+    M.barnRoof = PBR('CorrugatedSteel009', 0x3f6f9e, 0.6, 0.34, 2.4);
+    M.barnRoofSouth = PBR('CorrugatedSteel009', 0x35608b, 0.62, 0.32, 2.4);
     M.skylight = S({ map: T.roof, color: 0xd3e2ea, roughness: 0.28, metalness: 0.18 });
     M.roofPlant = PBR('CorrugatedSteel009', 0x8a979c, 0.52, 0.38, 2.4);
     M.timber = S({ color: 0x54402f, roughness: 0.85 });
@@ -179,6 +183,9 @@ import { FL } from './fl.js';
     M.steel = S({ color: 0x38424a, roughness: 0.42, metalness: 0.75 });
     M.steelLight = S({ color: 0xa7b5bd, roughness: 0.3, metalness: 0.85 });
     M.galv = PBR('CorrugatedSteel009', 0xa8b2b6, 0.42, 0.62, 1.8);
+    // TMR 的罐子：白色烤漆钢板（筒仓 / 成品仓 / 搅拌车罐体同色）
+    M.tmrWhite = S({ color: 0xf0f1ea, roughness: 0.38, metalness: 0.22 });
+    M.tmrWhite.envMapIntensity = 1.15;
     M.glass = S({ color: 0x0c161d, roughness: 0.07, metalness: 0.9 });
     // 大面积玻璃幕墙：纯镜面在没有强环境光时整片发黑，单独给一个带底色的版本
     M.curtain = S({ color: 0x5a6b78, roughness: 0.34, metalness: 0.06, envMapIntensity: 2.0 });
@@ -448,9 +455,6 @@ import { FL } from './fl.js';
 
     // 灯杆
     const poles = [
-      [-30, -34, 9.6, Math.PI / 2, true],
-      [30, -34, 9.6, Math.PI / 2, true],
-      [86, -34, 9.6, Math.PI / 2, true],
       [-100, 44, 9.2, -Math.PI / 2, true],
       [-66, 58, 8.8, Math.PI, false],
       [108, 18, 9.2, -Math.PI / 2, true],
