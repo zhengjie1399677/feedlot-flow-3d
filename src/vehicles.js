@@ -28,7 +28,7 @@ import { FL } from './fl.js';
    * ============================================================ */
   function materials(P) {
     return {
-      paint: U.std({ color: P.paint, roughness: 0.4, metalness: 0.45 }),
+      paint: U.std({ color: P.paint, roughness: 0.55, metalness: 0.22 }),
       accent: U.std({ color: P.accent, roughness: 0.5, metalness: 0.25, emissive: P.accent, emissiveIntensity: 0.18 }),
       dark: U.std({ color: 0x191d20, roughness: 0.74, metalness: 0.32 }),
       glass: U.std({ color: 0x0a1216, roughness: 0.12, metalness: 0.6 }),
@@ -53,19 +53,72 @@ import { FL } from './fl.js';
   function tube(kit, mat, r1, r2, h, seg, x, y, z, rx, ry, rz) {
     return part(kit, mat, new THREE.CylinderGeometry(r1, r2, h, seg || 14), x, y, z, rx, ry, rz);
   }
+  // 斜撑：从 A 点拉到 B 点的方钢（牵引架 / 支撑杆 / 液压缸都用它）
+  function strut(kit, mat, ax, ay, az, bx, by, bz, t) {
+    const dx = bx - ax, dy = by - ay, dz = bz - az;
+    const len = Math.hypot(dx, dy, dz) || 0.001;
+    const g = new THREE.BoxGeometry(t, len, t);
+    const q = new THREE.Quaternion().setFromUnitVectors(
+      new THREE.Vector3(0, 1, 0),
+      new THREE.Vector3(dx / len, dy / len, dz / len)
+    );
+    g.applyMatrix4(new THREE.Matrix4().compose(
+      new THREE.Vector3((ax + bx) / 2, (ay + by) / 2, (az + bz) / 2),
+      q, new THREE.Vector3(1, 1, 1)
+    ));
+    kit.add(g, mat);
+  }
+
   // 车轮：独立成组（轮轴沿 X），这样每帧能绕轴自转
+  // 胎体 + 胎肩 + 花纹块 + 轮辋 + 轮毂螺栓（合并后每轮 2~3 个 draw call）
   function wheel(m, x, z, r, w) {
     const g = new THREE.Group();
     g.position.set(x, r, z);
-    const tire = new THREE.CylinderGeometry(r, r, w, 16);
+    const k = new U.Kit();
+
+    const tire = new THREE.CylinderGeometry(r, r, w, 22);
     tire.rotateZ(Math.PI / 2);
-    const tm = new THREE.Mesh(tire, m.tire);
-    tm.castShadow = true;
-    g.add(tm);
-    const hub = new THREE.CylinderGeometry(r * 0.44, r * 0.44, w + 0.03, 12);
-    hub.rotateZ(Math.PI / 2);
-    const hm = new THREE.Mesh(hub, m.steel);
-    g.add(hm);
+    k.add(tire, m.tire);
+    // 胎肩（两侧收进去一点，避免圆柱两端的硬边）
+    for (const sx of [-1, 1]) {
+      const sh = new THREE.CylinderGeometry(r * 0.9, r * 0.78, w * 0.2, 22);
+      sh.rotateZ(Math.PI / 2);
+      sh.translate(sx * (w * 0.4), 0, 0);
+      k.add(sh, m.tire);
+    }
+    // 花纹块（跟着轮子一起转）
+    const n = r > 0.72 ? 16 : 13;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      const lug = new THREE.BoxGeometry(w * 0.8, r * 0.1, r * 0.28);
+      lug.translate(0, r * 0.96, 0);
+      lug.rotateX(a);
+      k.add(lug, m.tire);
+    }
+    // 轮辋
+    const ring = new THREE.CylinderGeometry(r * 0.62, r * 0.62, w * 0.88, 18);
+    ring.rotateZ(Math.PI / 2);
+    k.add(ring, m.steel);
+    for (const sx of [-1, 1]) {
+      const disc = new THREE.CylinderGeometry(r * 0.55, r * 0.55, 0.06, 18);
+      disc.rotateZ(Math.PI / 2);
+      disc.translate(sx * (w * 0.42), 0, 0);
+      k.add(disc, m.dark);
+      const hubc = new THREE.CylinderGeometry(r * 0.19, r * 0.19, 0.1, 12);
+      hubc.rotateZ(Math.PI / 2);
+      hubc.translate(sx * (w * 0.46), 0, 0);
+      k.add(hubc, m.steel);
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2;
+        const b = new THREE.CylinderGeometry(r * 0.05, r * 0.05, 0.12, 6);
+        b.rotateZ(Math.PI / 2);
+        b.translate(0, r * 0.34, 0);
+        b.rotateX(a);
+        b.translate(sx * (w * 0.47), 0, 0);
+        k.add(b, m.steel);
+      }
+    }
+    k.build(g);
     return g;
   }
 
@@ -194,94 +247,198 @@ import { FL } from './fl.js';
     return { kit: kit, m: m, len: 13.8, lightZ: 6.2, tailZ: -6.3, labelY: 5.8, wheels: wheels, bed: bed, cargo: cargo };
   }
 
-  /* TMR 日粮车（拖拉机 + 卧式搅拌罐） */
+  /* TMR 日粮车（自走式卧式饲料搅拌车）
+   *   三个识别点：
+   *   ① 敞口搅拌仓 —— 俯视能看见仓里的饲料和旋转的螺旋绞龙
+   *   ② 右侧前置出料输送带 —— 顺着料槽边走边投料，最像饲料车的地方
+   *   ③ 尾部出料门（投料/卸料时向外翻开）+ 后置发动机舱
+   */
   function buildTmrTruck(P) {
     const kit = new U.Kit();
     const m = materials(P);
     const wheels = [];
-    const mix = U.std({ color: 0xf0f1ea, roughness: 0.38, metalness: 0.22 });
-    // 拖拉机底盘
-    box(kit, m.dark, 1.5, 0.34, 8.6, 0, 1.0, 0);
-    // 后车架（罐体支撑）
-    box(kit, m.dark, 1.9, 0.3, 5.0, 0, 1.15, -2.4);
-    // 拖拉机机体
-    rbox(kit, m.paint, 2.05, 1.4, 1.9, 0.14, 0, 1.85, 4.95);
-    box(kit, m.paint, 1.55, 0.9, 1.7, 0, 1.75, 6.55);
-    rbox(kit, m.dark, 1.9, 0.46, 1.5, 0.1, 0, 3.05, 5.0);
-    box(kit, m.glass, 1.75, 0.66, 0.07, 0, 2.42, 6.42, -0.1, 0, 0);
-    box(kit, m.glass, 0.06, 0.62, 1.0, 1.03, 2.38, 5.05);
-    box(kit, m.glass, 0.06, 0.62, 1.0, -1.03, 2.38, 5.05);
-    box(kit, m.light, 0.4, 0.18, 0.1, 0.6, 1.6, 7.42);
-    box(kit, m.light, 0.4, 0.18, 0.1, -0.6, 1.6, 7.42);
-    box(kit, m.dark, 1.5, 0.3, 0.2, 0, 1.1, 7.42);
-    // 排气管
-    tube(kit, m.steel, 0.09, 0.09, 1.9, 8, 0.86, 3.0, 6.2);
-    // 搅拌罐
-    const drum = new THREE.CylinderGeometry(1.42, 1.42, 4.6, 22, 1);
-    drum.rotateX(Math.PI / 2);
-    drum.applyMatrix4(U.mat4(0, 2.95, -2.4));
-    kit.add(drum, mix);
-    const cone = new THREE.CylinderGeometry(0.9, 1.42, 1.3, 22, 1, true);
-    cone.rotateX(Math.PI / 2);
-    cone.applyMatrix4(U.mat4(0, 2.95, 0.6));
-    kit.add(cone, mix);
-    // 罐体加强箍
-    for (let i = 0; i < 4; i++) {
-      const ring = new THREE.CylinderGeometry(1.47, 1.47, 0.1, 22, 1, true);
+
+    // —— 专用材质 ——
+    const mixDS = U.std({ color: 0xeff0e8, roughness: 0.44, metalness: 0.24, side: THREE.DoubleSide });
+    const feed = U.std({ color: 0x7b6440, roughness: 0.96, metalness: 0.0, side: THREE.DoubleSide });
+    const rub = U.std({ color: 0x14161a, roughness: 0.9, metalness: 0.05 });
+    const chro = U.std({ color: 0xc2cbd1, roughness: 0.18, metalness: 0.92 });
+    const grille = U.std({ color: 0x24292c, roughness: 0.7, metalness: 0.35 });
+    const glass = U.std({ color: 0x33454f, roughness: 0.14, metalness: 0.72 });
+
+    /* ================= 底盘 ================= */
+    box(kit, m.dark, 0.24, 0.36, 8.8, 0.9, 1.1, 0.5);
+    box(kit, m.dark, 0.24, 0.36, 8.8, -0.9, 1.1, 0.5);
+    for (let i = 0; i < 5; i++) box(kit, m.dark, 2.0, 0.2, 0.22, 0, 1.1, 4.4 - i * 2.1);
+    box(kit, m.dark, 2.0, 0.22, 0.36, 0, 0.72, 4.55);       // 前桥
+    box(kit, m.dark, 2.1, 0.34, 2.1, 0, 0.86, -2.1);        // 后桥
+    box(kit, m.dark, 1.1, 0.34, 0.4, 0, 1.0, -4.45);        // 尾配重
+    box(kit, m.accent, 0.3, 0.32, 0.16, 0, 1.0, -4.62);
+
+    /* ================= 驾驶室（偏左：右边让给出料输送带）================= */
+    const CB = -0.30;
+    rbox(kit, m.paint, 1.88, 0.72, 2.36, 0.12, CB, 1.86, 4.42);      // 腰部裙板
+    box(kit, glass, 1.7, 1.28, 2.16, CB, 2.86, 4.42);                // 玻璃体
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+      box(kit, m.paint, 0.1, 1.32, 0.1, CB + sx * 0.87, 2.86, 4.42 + sz * 1.04);
+    }
+    for (const sx of [-1, 1]) box(kit, m.paint, 0.12, 1.28, 0.13, CB + sx * 0.86, 2.86, 4.42);   // B 柱
+    box(kit, m.paint, 1.96, 0.07, 2.44, CB, 3.5, 4.42);               // 车顶绿色檐边
+    rbox(kit, mixDS, 1.92, 0.15, 2.4, 0.07, CB, 3.6, 4.42);          // 白色顶板
+    box(kit, glass, 1.66, 1.24, 0.07, CB, 2.86, 5.5, -0.14, 0, 0);   // 前挡风
+    box(kit, m.paint, 1.72, 0.09, 0.12, CB, 2.23, 5.48);            // 前挡风下框
+    box(kit, m.paint, 0.055, 1.26, 0.1, CB, 2.86, 5.5, -0.14, 0, 0);// 前挡风中分隔
+    for (const sx of [-1, 1]) box(kit, m.dark, 0.78, 0.03, 0.03, CB + sx * 0.4, 2.3, 5.44, -0.14, 0, 0);
+    box(kit, m.paint, 1.72, 0.06, 0.3, CB, 3.5, 5.44, -0.2, 0, 0);   // 遮阳板
+    rbox(kit, m.paint, 1.9, 0.38, 0.42, 0.1, CB, 1.4, 5.44);         // 前保险杠
+    box(kit, grille, 1.3, 0.42, 0.1, CB, 1.84, 5.63);                // 格栅（贴在裙板前脸外）
+    for (let i = 0; i < 4; i++) box(kit, m.steel, 1.22, 0.03, 0.05, CB, 1.7 + i * 0.09, 5.69);
+    for (const sx of [-1, 1]) {
+      box(kit, m.dark, 0.34, 0.26, 0.08, CB + sx * 0.74, 1.86, 5.62); // 大灯座
+      box(kit, m.light, 0.26, 0.17, 0.06, CB + sx * 0.74, 1.9, 5.67);
+      box(kit, m.accent, 0.16, 0.1, 0.06, CB + sx * 0.74, 1.64, 5.66);
+      // 后视镜
+      box(kit, m.dark, 0.05, 0.05, 0.44, CB + sx * 1.06, 3.16, 5.16);
+      box(kit, m.dark, 0.09, 0.5, 0.22, CB + sx * 1.24, 2.96, 5.3);
+    }
+    // 车门缝 + 门把手
+    box(kit, m.dark, 0.02, 1.2, 0.03, CB + 0.94, 2.86, 4.02);
+    box(kit, m.steel, 0.06, 0.06, 0.2, CB + 0.96, 2.5, 3.86);
+    // 车顶警示灯 + 作业灯
+    tube(kit, m.accent, 0.1, 0.1, 0.2, 10, CB + 0.5, 3.76, 4.72);
+    for (const sx of [-1, 1]) box(kit, m.light, 0.24, 0.09, 0.06, CB + sx * 0.6, 3.66, 5.42);
+    // 上车踏板（左侧）
+    for (let i = 0; i < 2; i++) box(kit, m.dark, 0.46, 0.07, 0.7, CB - 1.02, 1.5 - i * 0.46, 3.66);
+    box(kit, m.dark, 0.05, 1.0, 0.05, CB - 1.22, 2.3, 3.86);
+
+    /* ================= 搅拌仓 ================= */
+    const R = 1.25, CY = 2.55, TOP = 3.8;
+    const Z0 = 3.0, Z1 = -3.3, TL = Z0 - Z1, ZC = (Z0 + Z1) / 2;
+
+    const SB = 3.02;                       // 涂装分界线：以下车头色、以上白钢
+    const shell = new THREE.CylinderGeometry(R, R, TL, 26, 1, true, -Math.PI / 2, Math.PI);
+    shell.rotateX(Math.PI / 2);
+    part(kit, m.paint, shell, 0, CY, ZC);
+    for (const sx of [-1, 1]) {
+      box(kit, m.paint, 0.12, SB - CY + 0.02, TL, sx * R, (CY + SB) / 2, ZC);   // 下半：车头同色
+      box(kit, mixDS, 0.12, TOP - SB, TL, sx * R, (SB + TOP) / 2, ZC);          // 上半：白钢
+      box(kit, m.steel, 0.26, 0.12, TL + 0.06, sx * (R + 0.03), TOP, ZC);       // 上沿走货台
+      box(kit, m.accent, 0.04, 0.17, TL + 0.02, sx * (R + 0.075), SB, ZC);      // 品牌色带压分界线
+      for (let i = 0; i < 3; i++) {                                             // 竖向加强筋
+        box(kit, m.steel, 0.05, TOP - CY - 0.12, 0.1, sx * (R + 0.08), (CY + TOP) / 2, ZC - TL / 2 + 1.0 + i * 1.9);
+      }
+    }
+    for (let i = 0; i < 5; i++) {                                               // 环形加强箍
+      const ring = new THREE.CylinderGeometry(R + 0.04, R + 0.04, 0.12, 26, 1, true, -Math.PI / 2, Math.PI);
       ring.rotateX(Math.PI / 2);
-      ring.applyMatrix4(U.mat4(0, 2.95, -4.3 + i * 1.25));
-      kit.add(ring, m.steel);
+      part(kit, m.steel, ring, 0, CY, ZC - TL / 2 + 0.5 + i * 1.32);
     }
-    // 尾部出料口
-    const rear = new THREE.CylinderGeometry(1.5, 1.5, 0.18, 22);
-    rear.rotateX(Math.PI / 2);
-    rear.applyMatrix4(U.mat4(0, 2.95, -4.75));
-    kit.add(rear, m.steel);
-    // 顶部螺旋轴管
-    tube(kit, m.accent, 0.34, 0.34, 5.4, 12, 0, 4.5, -2.6, Math.PI / 2, 0, 0);
-    tube(kit, m.steel, 0.4, 0.4, 0.5, 12, 0, 4.5, -5.2, Math.PI / 2, 0, 0);
-    // 侧面投料输送带
-    box(kit, m.accent, 3.1, 0.26, 0.5, 2.1, 2.55, -1.4, 0, 0, 0.16);
-    box(kit, m.dark, 2.6, 0.1, 0.42, 2.1, 2.72, -1.4, 0, 0, 0.16);
-    box(kit, m.dark, 0.5, 1.5, 0.3, 3.4, 1.55, -1.35);
-    // 罐体标识
-    box(kit, m.accent, 0.02, 0.35, 3.4, 1.43, 2.95, -2.4);
-    // 梯子
-    for (let i = 0; i < 4; i++) {
-      box(kit, m.steel, 0.42, 0.05, 0.05, 0.1, 1.9 + i * 0.62, -5.15);
-    }
-    // ---- 搅拌筒内的螺旋叶片（独立组，绕筒轴旋转 → 一眼看出在搅拌）----
+    // 前后端墙
+    box(kit, m.paint, 2.6, SB - (CY - R), 0.14, 0, (SB + CY - R) / 2, Z0);
+    box(kit, mixDS, 2.6, TOP - SB, 0.14, 0, (SB + TOP) / 2, Z0);
+    box(kit, mixDS, 2.6, TOP - 2.72, 0.12, 0, (TOP + 2.72) / 2, Z1);
+    // 仓内饲料：装到六成，绞龙从料面里露出来
+    box(kit, feed, 2.32, 0.92, TL - 0.3, 0, 2.9, ZC);
+
+    /* ---- 螺旋绞龙：绕仓轴转，投料时更快 ---- */
     const drumGrp = new THREE.Group();
-    drumGrp.position.set(0, 2.95, -2.4);
-    const bladeKit = new U.Kit();
-    for (let k = 0; k < 3; k++) {
-      const a = (k * Math.PI * 2) / 3;
-      const dir = new THREE.Vector3(Math.cos(a), Math.sin(a), 0);
-      const pos = new THREE.Vector3(0, 0, -2.0);
-      const g = new THREE.BoxGeometry(0.16, 0.16, 4.3);
-      // 沿筒轴方向贴一段斜叶片：绕轴取一段 30° 圆弧的薄片
-      const seg = new THREE.BoxGeometry(0.62, 0.1, 4.2);
-      seg.applyMatrix4(U.mat4(dir.x * 1.34, dir.y * 1.34, 0, 0, 0, a + Math.PI / 2));
-      bladeKit.add(seg, m.accent);
-      g.dispose();
+    drumGrp.position.set(0, CY, ZC);
+    const dk = new U.Kit();
+    const shaft = new THREE.CylinderGeometry(0.15, 0.15, TL - 0.3, 12);
+    shaft.rotateX(Math.PI / 2);
+    dk.add(shaft, m.steel);
+    for (let f = 0; f < 2; f++) {
+      for (let i = 0; i < 34; i++) {
+        const z = -TL / 2 + 0.4 + i * ((TL - 0.8) / 33);
+        const a = f * Math.PI + i * 0.36;
+        const plate = new THREE.BoxGeometry(0.05, 0.36, 0.44);
+        plate.applyMatrix4(U.mat4(Math.cos(a) * 0.96, Math.sin(a) * 0.96, z, 0, 0, a - Math.PI / 2));
+        dk.add(plate, m.steel);
+        if (i % 4 === 0) {   // 连着轴的支撑臂
+          const arm = new THREE.BoxGeometry(0.07, 0.95, 0.09);
+          arm.applyMatrix4(U.mat4(Math.cos(a) * 0.5, Math.sin(a) * 0.5, z, 0, 0, a - Math.PI / 2));
+          dk.add(arm, m.steel);
+        }
+      }
     }
-    bladeKit.build(drumGrp);
-    // 尾部出料门（投料时抬起）
+    dk.build(drumGrp);
+    drumGrp.traverse(function (o) { if (o.isMesh) { o.castShadow = false; o.receiveShadow = true; } });
+
+    /* ---- 尾部出料门（绕底边向外翻）---- */
     const gate = new THREE.Group();
-    gate.position.set(0, 2.95, -4.9);
-    const gateKit = new U.Kit();
-    U.box(gateKit, m.steel, 1.5, 0.1, 1.05, 0, -0.5, -0.5);
-    U.box(gateKit, m.light, 1.55, 0.1, 0.12, 0, -0.52, -1.0);
-    gateKit.build(gate);
-    // 轮
-    wheels.push(wheel(m, 1.28, 6.1, 0.66, 0.5), wheel(m, -1.28, 6.1, 0.66, 0.5));
-    wheels.push(wheel(m, 1.28, 3.1, 0.92, 0.62), wheel(m, -1.28, 3.1, 0.92, 0.62));
+    gate.position.set(0, CY - R, Z1 - 0.03);
+    const gk = new U.Kit();
+    U.box(gk, m.steel, 2.5, 1.46, 0.1, 0, 0.75, 0);
+    U.box(gk, m.accent, 2.52, 0.16, 0.13, 0, 1.36, -0.04);
+    U.box(gk, m.dark, 0.1, 1.42, 0.13, 0.9, 0.75, -0.04);
+    U.box(gk, m.dark, 0.1, 1.42, 0.13, -0.9, 0.75, -0.04);
+    gk.build(gate);
+    for (const sx of [-1, 1]) strut(kit, chro, sx * 1.1, TOP - 0.08, Z1 + 0.14, sx * 1.1, 2.3, Z1 - 0.1, 0.1);
+
+    /* ---- 右侧前置出料输送带：从仓底前部斜向前上方伸出 ---- */
+    const CX = 1.62, CYB = 1.55, CZ = 3.85, CL = 3.5, CT = -0.24;
+    const lift = Math.sin(-CT);
+    box(kit, m.dark, 0.9, 0.16, CL, CX, CYB, CZ, CT, 0, 0);                            // 机架
+    box(kit, rub, 0.7, 0.05, CL - 0.1, CX, CYB + 0.12, CZ, CT, 0, 0);                  // 皮带
+    for (const sx of [-1, 1]) box(kit, m.accent, 0.06, 0.18, CL - 0.1, CX + sx * 0.45, CYB + 0.1, CZ, CT, 0, 0);
+    for (let i = 0; i < 10; i++) {                                                     // 皮带横筋
+      box(kit, m.steel, 0.72, 0.04, 0.08, CX, CYB + 0.16, CZ - CL / 2 + 0.35 + i * (CL - 0.7) / 9, CT, 0, 0);
+    }
+    // 出料头（前端）：头部滚筒 + 下料斗
+    const hz = CZ + CL / 2 - 0.1, hy = CYB + (CL / 2 - 0.1) * lift;
+    const roller = new THREE.CylinderGeometry(0.16, 0.16, 0.78, 12);
+    roller.rotateZ(Math.PI / 2);
+    part(kit, chro, roller, CX, hy + 0.03, hz);
+    box(kit, m.dark, 0.8, 0.16, 0.28, CX, hy - 0.1, hz + 0.14);
+    box(kit, m.accent, 0.86, 0.07, 0.38, CX, hy + 0.17, hz + 0.1);
+    // 尾部接料斗 + 折叠铰点 + 液压缸 + 支撑
+    const pz = CZ - CL / 2 + 0.12, py = CYB - (CL / 2 - 0.12) * lift;
+    box(kit, m.steel, 0.94, 0.46, 0.8, CX - 0.02, py + 0.2, pz - 0.16);
+    box(kit, m.dark, 0.88, 0.2, 0.72, CX - 0.02, py + 0.44, pz - 0.16);
+    box(kit, m.dark, 0.5, 0.32, 0.34, CX - 0.34, CYB - 0.1, pz + 0.06);
+    strut(kit, chro, CX - 0.18, CYB - 0.24, pz + 0.34, CX - 0.1, CYB - 0.85, pz + 1.15, 0.09);
+    strut(kit, m.dark, 0.8, 1.2, 4.95, CX - 0.42, CYB - 0.05, 4.7, 0.11);
+    strut(kit, m.dark, 0.8, 1.2, 3.15, CX - 0.42, CYB - 0.05, 3.0, 0.11);
+    strut(kit, m.dark, R + 0.02, 1.85, 2.75, CX - 0.44, CYB - 0.02, 2.75, 0.1);
+    // 右侧前轮护罩
+    rbox(kit, m.paint, 0.72, 0.1, 1.7, 0.04, 0.72, 1.44, 4.55);
+    box(kit, m.accent, 0.74, 0.06, 0.06, 0.72, 1.36, 5.38);
+
+    /* ---- 尾部发动机舱 ---- */
+    rbox(kit, m.paint, 2.34, 1.06, 1.26, 0.1, 0, 1.62, -3.92);
+    box(kit, grille, 1.9, 0.78, 0.07, 0, 1.86, -4.52);
+    for (let i = 0; i < 5; i++) box(kit, m.steel, 1.8, 0.03, 0.04, 0, 1.56 + i * 0.16, -4.56);
+    tube(kit, m.dark, 0.1, 0.1, 1.6, 8, 0.82, 3.1, -3.7);
+    tube(kit, chro, 0.12, 0.12, 0.18, 8, 0.82, 3.96, -3.7);
+    for (const sx of [-1, 1]) {
+      box(kit, m.dark, 0.24, 0.24, 0.08, sx * 0.88, 1.28, -4.55);
+      box(kit, m.red, 0.18, 0.14, 0.06, sx * 0.88, 1.28, -4.6);
+    }
+    for (let i = 0; i < 3; i++) box(kit, m.accent, 2.3, 0.05, 0.04, 0, 1.16 + i * 0.1, -4.54);
+    // 尾部爬梯
+    for (const sx of [-1, 1]) box(kit, m.dark, 0.05, 2.3, 0.05, -0.62 + sx * 0.2, 2.4, -4.6);
+    for (let i = 0; i < 6; i++) box(kit, m.steel, 0.4, 0.04, 0.05, -0.62, 1.45 + i * 0.4, -4.6);
+
+    /* ---- 仓顶栏杆（左侧走货台，右侧留给出料输送带）---- */
+    for (const z of [2.2, 0.6, -1.0, -2.6]) {
+      box(kit, m.steel, 0.05, 0.72, 0.05, -(R + 0.1), TOP + 0.4, z);
+    }
+    box(kit, m.steel, 0.06, 0.05, TL - 0.6, -(R + 0.1), TOP + 0.72, ZC);
+    box(kit, m.steel, 0.05, 0.05, TL - 0.6, -(R + 0.1), TOP + 0.36, ZC);
+
+    /* ================= 车轮 ================= */
+    wheels.push(wheel(m, 1.12, 4.55, 0.66, 0.5), wheel(m, -1.12, 4.55, 0.66, 0.5));
+    for (const z of [-1.35, -2.85]) {
+      wheels.push(wheel(m, 1.24, z, 0.72, 0.56), wheel(m, -1.24, z, 0.72, 0.56));
+    }
+    // 后轮挡泥板
+    for (const sx of [-1, 1]) rbox(kit, m.paint, 0.66, 0.1, 2.2, 0.05, sx * 1.24, 1.52, -2.1);
+
     return {
-      kit: kit, m: m, len: 13.0, lightZ: 7.5, tailZ: -5.0, labelY: 5.9,
+      kit: kit, m: m, len: 10.6, lightZ: 5.6, tailZ: -4.6, labelY: 4.7,
       wheels: wheels, drum: drumGrp, gate: gate,
     };
   }
-
   /* ============================================================
    *  路线站表
    *  —— 不再预生成"时间→位置"的表，而是按距离实时积分：

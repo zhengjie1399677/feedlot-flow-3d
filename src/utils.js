@@ -68,11 +68,19 @@ import { FL } from './fl.js';
   const surfaceCache = {};
   const texLoader = new THREE.TextureLoader();
 
-  function loadMap(url, srgb, aniso) {
+  const SURFACE_FILES = {
+    Asphalt033: ['color', 'normal', 'rough', 'ao'],
+    Concrete034: ['color', 'normal', 'rough'],
+    CorrugatedSteel009: ['color', 'normal', 'rough', 'ao', 'metal'],
+    PaintedPlaster017: ['color', 'normal', 'rough'],
+  };
+
+  function loadMap(url, srgb, aniso, channel) {
     const t = texLoader.load(url);
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
     t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
     t.anisotropy = aniso || 8;
+    if (channel != null) t.channel = channel;
     return t;
   }
 
@@ -81,16 +89,38 @@ import { FL } from './fl.js';
     if (surfaceCache[name]) return surfaceCache[name];
     const base = 'tex/' + name + '/';
     const aniso = opts.aniso || 8;
+    const files = SURFACE_FILES[name] || ['color', 'normal', 'rough'];
+    const has = (k) => files.indexOf(k) !== -1;
     const out = {
-      map: loadMap(base + 'color.jpg', true, aniso),
-      normalMap: loadMap(base + 'normal.jpg', false, aniso),
-      roughnessMap: loadMap(base + 'rough.jpg', false, aniso),
-      aoMap: loadMap(base + 'ao.jpg', false, aniso),
-      metalnessMap: loadMap(base + 'metal.jpg', false, aniso),
+      map: has('color') ? loadMap(base + 'color.jpg', true, aniso) : null,
+      normalMap: has('normal') ? loadMap(base + 'normal.jpg', false, aniso) : null,
+      roughnessMap: has('rough') ? loadMap(base + 'rough.jpg', false, aniso) : null,
+      aoMap: has('ao') ? loadMap(base + 'ao.jpg', false, aniso, 0) : null,
+      metalnessMap: has('metal') ? loadMap(base + 'metal.jpg', false, aniso) : null,
       tile: opts.tile || 3,
     };
     surfaceCache[name] = out;
     return out;
+  };
+
+  /* 三平面世界尺度 UV：给圆角盒 / ExtrudeGeometry 也铺上不拉伸的 PBR 贴图 */
+  U.triplanarUV = function (geo, tile) {
+    if (!tile) return geo;
+    const pos = geo.getAttribute('position');
+    const nor = geo.getAttribute('normal');
+    if (!pos || !nor) return geo;
+    const uv = geo.getAttribute('uv') || new THREE.BufferAttribute(new Float32Array(pos.count * 2), 2);
+    const inv = 1 / tile;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+      const nx = Math.abs(nor.getX(i)), ny = Math.abs(nor.getY(i)), nz = Math.abs(nor.getZ(i));
+      if (ny >= nx && ny >= nz) uv.setXY(i, x * inv, z * inv);
+      else if (nx >= nz) uv.setXY(i, z * inv, y * inv);
+      else uv.setXY(i, x * inv, y * inv);
+    }
+    geo.setAttribute('uv', uv);
+    uv.needsUpdate = true;
+    return geo;
   };
 
   // 把 BoxGeometry 的 uv 从 0..1 改成「每 tile 米一次」，这样同一套贴图
@@ -582,9 +612,11 @@ import { FL } from './fl.js';
 
   U.box = function (kit, mat, w, h, d, x, y, z, rx, ry, rz, r) {
     const g = r ? U.roundedBox(w, h, d, r) : new THREE.BoxGeometry(w, h, d);
-    // 材质声明了自己在世界里的铺贴边长（userData.tile），就按尺寸把 uv 铺开，
-    // 免得 40 m 的墙和 2 m 的箱子共用同一张 0..1 的图、一个拉成条纹一个糊成色块
-    if (!r && mat && mat.userData && mat.userData.tile) U.boxUV(g, w, h, d, mat.userData.tile);
+    // 材质声明了自己在世界里的铺贴边长（userData.tile），就按尺寸把 uv 铺开
+    if (mat && mat.userData && mat.userData.tile) {
+      if (r) U.triplanarUV(g, mat.userData.tile);
+      else U.boxUV(g, w, h, d, mat.userData.tile);
+    }
     kit.add(g, mat, U.mat4(x, y, z, rx, ry, rz));
   };
 

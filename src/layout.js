@@ -72,15 +72,15 @@ import { FL } from './fl.js';
       { cx: 76, cz: -28, len: 40, dep: 20, idx: 6, mirror: true },
     ],
 
-    /* 场区中部（生产区以南，用围墙隔开）：交易中心 / 员工办公 / 机修 */
+    /* 场区中部（生产区以南，用围墙隔开）：交易中心 / 员工办公 / 精简生态停车场 */
     market: {
       wall: { z: -11, x0: -50, x1: 104, gates: [[-48, -38]], walkGate: [58, 61.5] },
-      hall: { cx: -20, cz: 2, w: 34, d: 19 },
-      pens: { x0: 0, z0: -9, cols: 3, rows: 2, w: 8.4, d: 7.4, gx: 1.8, gz: 1.8 },
-      ramp: { x: 31.5, z: 2 },
-      scale: { x: 38, z: 16 },
-      parking: { x0: 44, x1: 104, z0: 24, z1: 40, aisle: 5.2, stall: 2.7 },
-      office: { cx: 12, cz: 68, w: 46, d: 12, rot: Math.PI },
+      hall: { cx: -20, cz: 2, w: 34, d: 18 },
+      pens: { x0: 2, z0: -9, cols: 3, rows: 2, w: 8.4, d: 7.4, gx: 1.8, gz: 1.8 },
+      ramp: { x: 33.5, z: 2 },
+      scale: { x: 40, z: 16 },
+      parking: { x0: 56, x1: 98, z0: 25, z1: 39, aisle: 5.0, stall: 3.0 },
+      office: { cx: 6, cz: 70, w: 30, d: 11, rot: 0 },
       workshop: { cx: 92, cz: 26 },
     },
 
@@ -260,12 +260,13 @@ import { FL } from './fl.js';
     ],
 
     cameras: [
-      { id: 'overview', label: '全览', target: [-2, 1, -12], theta: 0.66, phi: 0.78, zoom: 0.93 },
-      { id: 'gate', label: '大门', target: [-104, 7, 56], theta: -1.15, phi: 0.95, zoom: 2.8 },
+      { id: 'overview', label: '全览', target: [0, 1, 2], theta: 0.44, phi: 0.82, zoom: 1.02 },
+      { id: 'gate', label: '大门', target: [-102, 6, 56], theta: -1.05, phi: 0.96, zoom: 2.8 },
       { id: 'weigh', label: '地磅', target: [-84, 5, 56], theta: 0.30, phi: 0.92, zoom: 3.0 },
-      { id: 'tmr', label: '配料', target: [-96, 9, -14], theta: 0.62, phi: 0.92, zoom: 2.3 },
+      { id: 'tmr', label: '配料', target: [-96, 10, -16], theta: 0.62, phi: 0.92, zoom: 2.3 },
       { id: 'barn', label: '牛舍', target: [-16, 6, -54], theta: 0.15, phi: 0.95, zoom: 2.2 },
-      { id: 'dock', label: '装车', target: [100, 5, -64], theta: 0.50, phi: 0.98, zoom: 2.7 },    ],
+      { id: 'dock', label: '装车', target: [100, 5, -64], theta: 0.50, phi: 0.98, zoom: 2.7 },
+    ],
 
     stages: [
       { id: 'gate', no: '01', label: '车辆进场', en: 'INBOUND', color: 0x63c9ff },

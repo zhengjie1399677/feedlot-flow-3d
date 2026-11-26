@@ -34,7 +34,7 @@ import { FL } from './fl.js';
       dusk: 'hdri/qwantani_sunset_puresky.hdr',
       night: 'hdri/qwantani_night_puresky.hdr',
     };
-    const INTENSITY = { dawn: 0.05, day: 0.10, dusk: 0.035, night: 0.08 };
+    const INTENSITY = { dawn: 0.42, day: 0.85, dusk: 0.36, night: 0.08 };
     const envs = {};
     const loading = {};
 
@@ -882,9 +882,9 @@ import { FL } from './fl.js';
         '  vec3 c = scene + bloom * uBloom;\n' +
         '  c = aces(c * uExposure);\n' +
         '  float l = dot(c, vec3(0.2126,0.7152,0.0722));\n' +
-        '  c = mix(c * vec3(0.88,0.97,1.10), c * vec3(1.06,1.0,0.94), smoothstep(0.02,0.55,l));\n' +
+        '  c = mix(c * vec3(0.95,0.99,1.04), c * vec3(1.03,1.0,0.97), smoothstep(0.05,0.65,l));\n' +
         '  vec2 q = (vUv - 0.5) * vec2(uAspect, 1.0);\n' +
-        '  float vig = 1.0 - smoothstep(0.58, 1.18, length(q)) * 0.26;\n' +
+        '  float vig = 1.0 - smoothstep(0.62, 1.24, length(q)) * 0.18;\n' +
         '  c *= vig;\n' +
         '  c = toSRGB(clamp(c, 0.0, 1.0));\n' +
         '  c += (hash(vUv * 1024.0 + uTime) - 0.5) / 255.0;\n' +
@@ -917,6 +917,10 @@ import { FL } from './fl.js';
         compMat.uniforms.uAspect.value = w / h;
       },
       setExposure: function (v) { compMat.uniforms.uExposure.value = v; },
+      setBloom: function (strength, threshold) {
+        if (strength != null) compMat.uniforms.uBloom.value = strength;
+        if (threshold != null) brightMat.uniforms.uThreshold.value = threshold;
+      },
       render: function (scene, camera, time) {
         if (!enabled) {
           renderer.setRenderTarget(null);

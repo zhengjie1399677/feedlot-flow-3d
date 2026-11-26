@@ -156,17 +156,16 @@ import { FL } from './fl.js';
       }
       key.position.copy(sunPos).lerp(moonPos, nightF);
       key.color.copy(blend(P.night.key, P.dusk.key, dayKey, nightF, dayF));
-      // 主光：正午 9.4 / 黄昏 5.4 / 夜 6.6（月光）
-      key.intensity = mix3(6.6, 5.4, 9.4);
+      // 主光：正午 3.6 / 黄昏 3.4（暖金长影）/ 夜间 1.15（深邃月光衬托暖灯）
+      key.intensity = mix3(1.15, 3.4, 3.6);
 
       /* ---- 环境光 / 暖补光 / 侧补光 ---- */
       hemi.color.copy(blend(P.night.sky, P.dusk.sky, P.day.sky, nightF, dayF));
       hemi.groundColor.copy(blend(P.night.ground, P.dusk.ground, P.day.ground, nightF, dayF));
-      // 环境光压到主光的 1/3 以下，阴影才有形状
-      hemi.intensity = mix3(2.0, 1.05, 1.15);
+      hemi.intensity = mix3(0.36, 0.72, 0.95);
       warm.color.copy(blend(P.night.warm, P.dusk.warm, P.day.warm, nightF, dayF));
-      warm.intensity = mix3(1.4, 0.95, 0.42);
-      fill.intensity = mix3(1.2, 0.60, 0.34);
+      warm.intensity = mix3(0.24, 0.78, 0.32);
+      fill.intensity = mix3(0.22, 0.42, 0.52);
 
       /* ---- 场内灯具（白天基本关掉）---- */
       const lampF = 0.08 + 0.92 * nightF;
@@ -177,6 +176,17 @@ import { FL } from './fl.js';
       for (let i = 0; i < poolMats.length; i++) poolMats[i].opacity = poolBase[i] * (0.10 + 0.90 * nightF);
       for (let i = 0; i < sprites.length; i++) sprites[i].material.opacity = spriteBase[i] * (0.15 + 0.85 * nightF);
       for (let i = 0; i < glowMats.length; i++) glowMats[i].emissiveIntensity = glowBase[i] * (0.10 + 0.90 * nightF);
+      const glbGlows = world.glbGlowMats || [];
+      for (let i = 0; i < glbGlows.length; i++) {
+        const g = glbGlows[i];
+        g.mat.emissiveIntensity = g.base * (0.06 + 0.94 * Math.max(nightF, duskF * 0.72));
+      }
+      // 白天收敛道路流光亮度，减少和路面标线的视觉噪音；黄昏与夜间明亮流动
+      const flowOpacity = mix3(0.95, 0.72, 0.42);
+      const flows = world.flows || [];
+      for (let i = 0; i < flows.length; i++) {
+        flows[i].mat.uniforms.uOpacity.value = flowOpacity;
+      }
       if (world.coneMat) world.coneMat.uniforms.uOpacity.value = 0.16 * (0.10 + 0.90 * nightF);
       if (baseGlowMat) baseGlowMat.opacity = baseGlowBase * (0.30 + 0.70 * nightF);
 
@@ -193,7 +203,8 @@ import { FL } from './fl.js';
         // 地平线以下的地色直接取雾色：远处地形吃成全雾色后与天空无缝
         if (sky && sky.setLand) sky.setLand(cFog);
       }
-      if (pipe && pipe.setExposure) pipe.setExposure(mix3(1.30, 1.18, 0.98));
+      if (pipe && pipe.setExposure) pipe.setExposure(mix3(1.06, 1.12, 1.04));
+      if (pipe && pipe.setBloom) pipe.setBloom(mix3(0.60, 0.36, 0.12), mix3(0.86, 1.02, 1.38));
 
       // 供 UI 判断时段
       phaseOut.night = nightF; phaseOut.dusk = duskF; phaseOut.day = dayF;

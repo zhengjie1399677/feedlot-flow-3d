@@ -140,17 +140,18 @@ import { FL } from './fl.js';
     // 真的凸出来——几何没变，读起来的"表面"已经不是那块色板了。
     const PBR = (surfName, color, rough, metal, tile) => {
       const t = U.surface(surfName, { tile: tile });
-      const m = S({
-        map: t.map,
-        normalMap: t.normalMap,
-        roughnessMap: t.roughnessMap,
-        aoMap: t.aoMap,
-        metalnessMap: t.metalnessMap,
+      const cfg = {
         color: color,
         roughness: rough,
         metalness: metal,
-        normalScale: new THREE.Vector2(1, 1),
-      });
+        normalScale: new THREE.Vector2(0.85, 0.85),
+      };
+      if (t.map) cfg.map = t.map;
+      if (t.normalMap) cfg.normalMap = t.normalMap;
+      if (t.roughnessMap) cfg.roughnessMap = t.roughnessMap;
+      if (t.aoMap) { cfg.aoMap = t.aoMap; cfg.aoMapIntensity = 0.7; }
+      if (t.metalnessMap) cfg.metalnessMap = t.metalnessMap;
+      const m = S(cfg);
       m.userData.tile = tile;
       return m;
     };
@@ -170,6 +171,9 @@ import { FL } from './fl.js';
     M.wall = PBR('PaintedPlaster017', 0xa9a496, 0.9, 0.02, 4);
     M.wallCool = PBR('PaintedPlaster017', 0x8a9193, 0.9, 0.02, 4);
     M.wallDark = PBR('CorrugatedSteel009', 0x748388, 0.62, 0.35, 2.4);
+    M.wallPlant = S({ color: 0x93a1a5, roughness: 0.8, metalness: 0.05 });
+    M.roofDeck = S({ color: 0x848e92, roughness: 0.86, metalness: 0.04 });
+    M.curtainOffice = S({ color: 0x7d94a3, roughness: 0.42, metalness: 0.1 });
     M.roof = PBR('CorrugatedSteel009', 0x7a5447, 0.62, 0.3, 2.4);
     M.roofSouth = PBR('CorrugatedSteel009', 0x6c4740, 0.64, 0.28, 2.4);
     // 牛舍专用蓝：墙 / 北排屋面 / 南排屋面（与其它建筑共用材质分开，避免整场变蓝）
@@ -183,9 +187,9 @@ import { FL } from './fl.js';
     M.steel = S({ color: 0x38424a, roughness: 0.42, metalness: 0.75 });
     M.steelLight = S({ color: 0xa7b5bd, roughness: 0.3, metalness: 0.85 });
     M.galv = PBR('CorrugatedSteel009', 0xa8b2b6, 0.42, 0.62, 1.8);
-    // TMR 的罐子：白色烤漆钢板（筒仓 / 成品仓 / 搅拌车罐体同色）
-    M.tmrWhite = S({ color: 0xf0f1ea, roughness: 0.38, metalness: 0.22 });
-    M.tmrWhite.envMapIntensity = 1.15;
+    // TMR 的罐子：哑光浅灰白烤漆钢板（避免强光下过曝死白）
+    M.tmrWhite = S({ color: 0xd9dfe3, roughness: 0.46, metalness: 0.30 });
+    M.tmrWhite.envMapIntensity = 1.0;
     M.glass = S({ color: 0x0c161d, roughness: 0.07, metalness: 0.9 });
     // 大面积玻璃幕墙：纯镜面在没有强环境光时整片发黑，单独给一个带底色的版本
     M.curtain = S({ color: 0x5a6b78, roughness: 0.34, metalness: 0.06, envMapIntensity: 2.0 });
@@ -468,17 +472,13 @@ import { FL } from './fl.js';
     ];
     for (const p of poles) lampPole(kit, M, world, p[0], p[1], p[2], p[3], p[4]);
 
-    // 树
+    // 场内景观小树丛（外围由 Blender 自然树木组团环绕，场内只留少量点缀）
     const trees = [
-      [-118, -86, 1.35, 'broad'], [-120, -62, 1.1, 'conifer'], [-121, -18, 1.2, 'broad'],
-      [-120, 82, 1.25, 'broad'], [-104, 88, 1.0, 'conifer'], [-58, 91, 1.15, 'broad'],
-      [2, 92, 1.05, 'conifer'], [40, 90, 1.2, 'broad'], [96, 90, 1.1, 'conifer'],
-      [121, 60, 1.15, 'broad'], [122, 12, 1.1, 'conifer'], [121, -34, 1.2, 'broad'],
-      [119, -88, 1.2, 'conifer'], [84, -96, 1.1, 'broad'], [30, -96, 1.0, 'conifer'],
-      [-40, -96, 1.15, 'broad'], [-96, -96, 1.1, 'conifer'], [116, -96, 0.9, 'broad'],
-      [116, 78, 1.0, 'broad'], [-114, 74, 0.95, 'broad'],
+      [-116, 80, 0.95, 'broad'], [-108, 84, 0.85, 'broad'],
+      [-26, 78, 0.90, 'broad'], [34, 78, 0.90, 'broad'],
+      [118, 66, 0.95, 'broad'], [118, -88, 0.95, 'broad'],
     ];
-    for (const t of trees) tree(kit, M, t[0], t[1], t[2], t[3] === 'conifer' ? 'conifer' : 'broad', rand);
+    for (const t of trees) tree(kit, M, t[0], t[1], t[2], 'broad', rand);
 
     // 料场杂物：油桶 / 托盘
     for (let i = 0; i < 6; i++) {
@@ -558,12 +558,12 @@ import { FL } from './fl.js';
   }
 
   const LABEL_POS = {
-    gate: [-108, 16.2, 61],
-    weigh: [-78, 12.4, 63],
-    sort: [-49, 15.6, -60],
-    tmr: [-98, 21.5, -16],
-    feed: [12, 16.4, -48],
-    load: [107, 13.4, -62],
+    gate: [-107, 13.5, 56],
+    weigh: [-84, 11.8, 56],
+    sort: [-48, 13.2, -62],
+    tmr: [-100, 17.5, 4],
+    feed: [26, 14.5, -45],
+    load: [106, 12.6, -66],
   };
 
   function buildLabels(world) {
@@ -578,7 +578,7 @@ import { FL } from './fl.js';
         toneMapped: false,
       });
       const sp = new THREE.Sprite(mat);
-      sp.scale.set(15.5, 4.6, 1);
+      sp.scale.set(13.6, 4.0, 1);
       sp.position.set(pos[0], pos[1], pos[2]);
       sp.renderOrder = 5;
       world.group.add(sp);
@@ -595,16 +595,16 @@ import { FL } from './fl.js';
     moon.position.set(-200, 285, 220);
     moon.target.position.set(0, 0, -10);
     moon.castShadow = true;
-    const s = 235;
+    const s = 265;
     moon.shadow.camera.left = -s;
     moon.shadow.camera.right = s;
     moon.shadow.camera.top = s;
     moon.shadow.camera.bottom = -s;
-    moon.shadow.camera.near = 80;
-    moon.shadow.camera.far = 900;
+    moon.shadow.camera.near = 40;
+    moon.shadow.camera.far = 960;
     moon.shadow.mapSize.set(2048, 2048);
-    moon.shadow.bias = -0.0007;
-    moon.shadow.normalBias = 0.75;
+    moon.shadow.bias = -0.0004;
+    moon.shadow.normalBias = 0.42;
     scene.add(moon);
     scene.add(moon.target);
 
@@ -697,8 +697,10 @@ import { FL } from './fl.js';
   /* ---------------- 入口 ---------------- */
   FL.buildWorld = function (scene) {
     const world = {
-    feedPiles: [],
+      feedPiles: [],
       barnShades: [],
+      glbRoofMats: [],
+      glbGlowMats: [],
       group: new THREE.Group(),
       flows: [],
       labels: [],

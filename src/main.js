@@ -13,10 +13,10 @@ import './daycycle.js';
 import './ui.js';
 
 function boot() {
-/* ============================================================
- *  main.js — 装配、循环、自适应
- *  URL 参数：?t=20 定格在第 20 秒（截图用）；?fx=0 关泛光；?ui=0 隐藏界面
- * ============================================================ */
+  /* ============================================================
+   *  main.js — 装配、循环、自适应
+   *  URL 参数：?t=20 定格在第 20 秒（截图用）；?fx=0 关泛光；?ui=0 隐藏界面
+   * ============================================================ */
   const U = FL.U;
 
   const q = new URLSearchParams(location.search);
@@ -77,7 +77,7 @@ function boot() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.6));
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.shadowMap.enabled = q.get('sh') !== '0';
-  renderer.shadowMap.type = THREE.PCFShadowMap;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = fxOn ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
@@ -119,7 +119,7 @@ function boot() {
       const v = document.getElementById('veil');
       if (v) v.classList.add('gone');
     };
-    ui = uiOn ? FL.createUI(fleet, rig) : { update: function () {}, reveal: revealVeil, setCutaway: function () {}, onCutaway: function () {} };
+    ui = uiOn ? FL.createUI(fleet, rig) : { update: function () { }, reveal: revealVeil, setCutaway: function () { }, onCutaway: function () { } };
     // 剖视 = 幽灵屋顶：屋顶不消失，而是淡成半透明，既保住体量又能看见舍内
     // 屋顶材质和其他建筑共用，先克隆一份专用，避免整场跟着变透明
     const roofMats = [];
@@ -149,14 +149,18 @@ function boot() {
     applyCut(cutOn);
     cutUpdate = function (dt) {
       roofGhost += (roofGhostTarget - roofGhost) * Math.min(1, dt * 4.0);
-      if (!roofMats.length) return;
       const o = 1 - 0.76 * roofGhost;
       const solid = roofGhost < 0.12;
       for (let i = 0; i < roofMats.length; i++) {
         const m = roofMats[i];
         m.opacity = o;
         m.depthWrite = solid;
-        m.needsUpdate = false;
+      }
+      const glbRoofs = world.glbRoofMats || [];
+      for (let i = 0; i < glbRoofs.length; i++) {
+        const m = glbRoofs[i];
+        m.opacity = o;
+        m.depthWrite = solid;
       }
     };
     if (ui.onCutaway) {
@@ -205,7 +209,11 @@ function boot() {
 
     for (let i = 0; i < world.labels.length; i++) {
       const l = world.labels[i];
-      l.sprite.position.y = l.base + Math.sin(simTime * 0.8 + i * 1.7) * 0.32;
+      l.sprite.position.y = l.base + Math.sin(simTime * 0.8 + i * 1.7) * 0.28;
+      // 距离自适应微调：防止远端标签缩成不可读的小黑条，也防止拉近时过大
+      const d = camera.position.distanceTo(l.sprite.position);
+      const sc = U.clamp(d / 285, 0.58, 1.25);
+      l.sprite.scale.set(13.6 * sc, 4.0 * sc, 1);
     }
 
     const hour = hourAt(simTime);
