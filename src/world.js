@@ -100,7 +100,124 @@ import { FL } from './fl.js';
     return c;
   }
 
-  /* 沿曲线撒短划线 */
+  /* 沿曲线撒短划线（自动避让交叉路口内部与内凹倒角区域） */
+  function inJunction(x, z, pad) {
+    pad = pad || 0;
+    for (const j of L.junctions) {
+      const rx = j.w * 0.5 + (j.r || 0) * 0.82 + pad;
+      const rz = j.d * 0.5 + (j.r || 0) * 0.82 + pad;
+      if (Math.abs(x - j.x) < rx && Math.abs(z - j.z) < rz) return true;
+    }
+    return false;
+  }
+
+  /* 真实工程内凹圆角倒角（Concave Corner Fillet）+ 配套内凹路缘与弧形白边线 */
+  function concaveFillet(kit, M, cx, cz, hwX, hwZ, sx, sz, R) {
+    const seg = 10;
+    const x0 = cx + sx * hwX;
+    const z0 = cz + sz * hwZ;
+
+    // 1) 沥青内凹倒角三角弧片
+    const shape = new THREE.Shape();
+    shape.moveTo(0, 0);
+    shape.lineTo(sx * R, 0);
+    for (let i = 1; i <= seg; i++) {
+      const a = (i / seg) * (Math.PI / 2);
+      const px = sx * R * (1 - Math.sin(a));
+      const pz = sz * R * (1 - Math.cos(a));
+      shape.lineTo(px, -pz);
+    }
+    shape.closePath();
+    const g = new THREE.ShapeGeometry(shape, 1);
+    const uv = g.getAttribute('uv');
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / 12, uv.getY(i) / 12);
+    g.rotateX(-Math.PI / 2);
+    g.translate(x0, 0.226, z0);
+    kit.add(g, M.asphalt);
+
+    // 2) 底层内凹混凝土路缘倒角（比沥青宽 0.75m）
+    const Rc = R + 0.75;
+    const cShape = new THREE.Shape();
+    cShape.moveTo(-sx * 0.75, -sz * 0.75);
+    cShape.lineTo(sx * R, -sz * 0.75);
+    cShape.lineTo(sx * R, 0);
+    for (let i = 1; i <= seg; i++) {
+      const a = (i / seg) * (Math.PI / 2);
+      const px = sx * (R - (Rc - R) * Math.sin(a) + (Rc - R) * 0) + sx * R * (1 - Math.sin(a)) - sx * R;
+      // 直接围绕圆心 (sx*(R+0.75), sz*(R+0.75)) 以半径 R 做平滑路缘外弧
+      const cpx = sx * (R + 0.75 - R * Math.sin(a));
+      const cpz = sz * (R + 0.75 - R * Math.cos(a));
+      cShape.lineTo(cpx, -cpz);
+    }
+    cShape.lineTo(-sx * 0.75, -sz * R);
+    cShape.closePath();
+    const gc = new THREE.ShapeGeometry(cShape, 1);
+    gc.rotateX(-Math.PI / 2);
+    gc.translate(x0, 0.134, z0);
+    kit.add(gc, M.curb);
+
+    // 3) 紧贴内凹弧线的白边线（距沥青边缘内缩 0.50m）
+    const Rl = Math.max(0.6, R + 0.50);
+    const pts = [];
+    for (let i = 0; i <= seg; i++) {
+      const a = (i / seg) * (Math.PI / 2);
+      const lx = x0 + sx * (R - Rl * Math.sin(a));
+      const lz = z0 + sz * (R - Rl * Math.cos(a));
+      pts.push([lx, lz]);
+    }
+    kit.add(ribbonGeo(pts, 0.16, 0.240, { uv: 6, tension: 0.2 }), M.line);
+  }
+
+  function clippedLineRibbon(kit, mat, pts, width, y, offset, clipPad) {
+    const curve = curveOf(pts);
+    const len = curve.getLength();
+    const step = 1.4;
+    const n = Math.max(12, Math.ceil(len / step));
+    const p = new THREE.Vector3();
+    const t = new THREE.Vector3();
+    const pos = [], uv = [], idx = [];
+    let dist = 0;
+    const prev = new THREE.Vector3();
+    let segOpen = false;
+    let baseVert = 0;
+
+    for (let i = 0; i <= n; i++) {
+      const u = i / n;
+      curve.getPointAt(u, p);
+      curve.getTangentAt(u, t);
+      t.y = 0;
+      t.normalize();
+      const nx = t.z, nz = -t.x;
+      const lx = p.x + nx * offset;
+      const lz = p.z + nz * offset;
+      if (i > 0) dist += Math.hypot(p.x - prev.x, p.z - prev.z);
+      prev.copy(p);
+
+      if (inJunction(lx, lz, clipPad)) {
+        segOpen = false;
+        continue;
+      }
+      const a = offset - width / 2;
+      const b = offset + width / 2;
+      const vIdx = pos.length / 3;
+      pos.push(p.x + nx * a, y, p.z + nz * a);
+      pos.push(p.x + nx * b, y, p.z + nz * b);
+      uv.push(dist / 6, 0, dist / 6, width / 6);
+      if (segOpen) {
+        idx.push(baseVert, vIdx, baseVert + 1, baseVert + 1, vIdx, vIdx + 1);
+      }
+      baseVert = vIdx;
+      segOpen = true;
+    }
+    if (!idx.length) return;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    g.setIndex(idx);
+    g.computeVertexNormals();
+    kit.add(g, mat);
+  }
+
   function dashLine(kit, mat, pts, w, dash, gap, y) {
     const curve = curveOf(pts);
     const len = curve.getLength();
@@ -108,6 +225,7 @@ import { FL } from './fl.js';
     const t = new THREE.Vector3();
     for (let d = 3; d < len - 3; d += dash + gap) {
       curve.getPointAt(d / len, p);
+      if (inJunction(p.x, p.z, 0.4)) continue;
       curve.getTangentAt(d / len, t);
       U.box(kit, mat, w, 0.02, dash, p.x, y, p.z, 0, Math.atan2(t.x, t.z), 0);
     }
@@ -138,36 +256,39 @@ import { FL } from './fl.js';
     // 开源 PBR 材质（ambientCG CC0）：albedo + normal + roughness + ao，
     // 贴图按 U.box 的世界尺度 uv 铺开，normalMap 让彩钢板的肋和混凝土的气孔
     // 真的凸出来——几何没变，读起来的"表面"已经不是那块色板了。
-    const PBR = (surfName, color, rough, metal, tile) => {
+    const PBR = (surfName, color, rough, metal, tile, opts) => {
+      opts = opts || {};
       const t = U.surface(surfName, { tile: tile });
       const cfg = {
         color: color,
         roughness: rough,
         metalness: metal,
-        normalScale: new THREE.Vector2(0.85, 0.85),
+        normalScale: new THREE.Vector2(opts.normalScale || 0.85, opts.normalScale || 0.85),
       };
       if (t.map) cfg.map = t.map;
       if (t.normalMap) cfg.normalMap = t.normalMap;
-      if (t.roughnessMap) cfg.roughnessMap = t.roughnessMap;
+      if (t.roughnessMap && !opts.noRoughMap) cfg.roughnessMap = t.roughnessMap;
       if (t.aoMap) { cfg.aoMap = t.aoMap; cfg.aoMapIntensity = 0.7; }
       if (t.metalnessMap) cfg.metalnessMap = t.metalnessMap;
       const m = S(cfg);
+      if (opts.env != null) m.envMapIntensity = opts.env;
       m.userData.tile = tile;
       return m;
     };
     const M = {};
     M.soil = S({ color: 0x1b1d18, roughness: 1 });
     M.plinth = S({ color: 0x0d100e, roughness: 1 });
-    M.grass = S({ map: T.grass, color: 0xb4c296, roughness: 1 });
-    M.lawn = S({ map: T.lawn, color: 0xa8b184, roughness: 1 });
-    M.apron = PBR('Concrete034', 0x77848e, 0.92, 0.02, 7);
-    M.apronEdge = PBR('Concrete034', 0x6d7c86, 0.95, 0.02, 5);
-    M.asphalt = PBR('Asphalt033', 0x5f6468, 0.95, 0.02, 9);
-    M.curb = PBR('Concrete034', 0x808f98, 0.95, 0.02, 2.2);
-    M.line = S({ color: 0xb8c2c4, roughness: 0.7 });
-    M.yellow = S({ color: 0xc79b3f, roughness: 0.65, metalness: 0.15 });
-    M.yard = PBR('Concrete034', 0x73828b, 0.95, 0.02, 6);
-    M.floor = PBR('Concrete034', 0x8e979c, 0.9, 0.02, 5);
+    M.grass = S({ map: T.grass, color: 0xb4c296, roughness: 1, envMapIntensity: 0.25 });
+    M.lawn = S({ map: T.lawn, color: 0xa8b184, roughness: 1, envMapIntensity: 0.25 });
+    const matteConc = { noRoughMap: true, normalScale: 0.22, env: 0.22 };
+    M.apron = PBR('Concrete034', 0x7b858c, 0.98, 0.0, 7, matteConc);
+    M.apronEdge = PBR('Concrete034', 0x707b82, 0.98, 0.0, 5, matteConc);
+    M.asphalt = PBR('Asphalt033', 0x5c6064, 0.96, 0.0, 9, { noRoughMap: true, normalScale: 0.30, env: 0.25 });
+    M.curb = PBR('Concrete034', 0x859096, 0.98, 0.0, 2.2, matteConc);
+    M.line = S({ color: 0xb8c2c4, roughness: 0.82, envMapIntensity: 0.3 });
+    M.yellow = S({ color: 0xc79b3f, roughness: 0.72, metalness: 0.08, envMapIntensity: 0.35 });
+    M.yard = PBR('Concrete034', 0x778289, 0.98, 0.0, 6, matteConc);
+    M.floor = PBR('Concrete034', 0x8e969a, 0.96, 0.0, 5, matteConc);
     M.wall = PBR('PaintedPlaster017', 0xa9a496, 0.9, 0.02, 4);
     M.wallCool = PBR('PaintedPlaster017', 0x8a9193, 0.9, 0.02, 4);
     M.wallDark = PBR('CorrugatedSteel009', 0x748388, 0.62, 0.35, 2.4);
@@ -194,8 +315,25 @@ import { FL } from './fl.js';
     // 大面积玻璃幕墙：纯镜面在没有强环境光时整片发黑，单独给一个带底色的版本
     M.curtain = S({ color: 0x5a6b78, roughness: 0.34, metalness: 0.06, envMapIntensity: 2.0 });
     M.concreteTrough = S({ color: 0x8f918a, roughness: 0.95 });
-    M.feed = S({ color: 0x6c5029, roughness: 1 });
-    M.feedPile = S({ map: T.grass, color: 0xb7a463, roughness: 1 });
+    M.feed = S({ color: 0x8b6f3c, roughness: 0.98 });
+    // 写实切碎全混合日粮（TMR）材质：金黄玉米青贮+干草碎丝+碎玉米粒+微凹凸，告别绿色海绵块
+    const tmrLoader = new THREE.TextureLoader();
+    const tmrMap = tmrLoader.load('textures/tmr_forage_albedo.jpg');
+    tmrMap.colorSpace = THREE.SRGBColorSpace;
+    tmrMap.wrapS = tmrMap.wrapT = THREE.RepeatWrapping;
+    tmrMap.anisotropy = 8;
+    const tmrBump = tmrLoader.load('textures/tmr_forage_bump.jpg');
+    tmrBump.wrapS = tmrBump.wrapT = THREE.RepeatWrapping;
+    M.feedPile = new THREE.MeshStandardMaterial({
+      map: tmrMap,
+      bumpMap: tmrBump,
+      bumpScale: 0.14,
+      color: 0xd6c79c,
+      vertexColors: true,
+      roughness: 0.99,
+      metalness: 0.0,
+      envMapIntensity: 0.22,
+    });
     M.silage = S({ color: 0x59612c, roughness: 1 });
     M.tarp = S({ map: T.tarp, color: 0xb2ad9a, roughness: 0.85 });
     M.film = S({ map: T.tarp, color: 0xd9d7cd, roughness: 0.55 });
@@ -246,8 +384,8 @@ import { FL } from './fl.js';
     // 场地
     flatRound(kit, M.apronEdge, 232, 168, 0, -4, 0.16, 13, 12);
     flatRound(kit, M.apron, 228, 164, 0, -4, 0.2, 12, 12);
-    // 场内水泥分区（配料场院）
-    flatRound(kit, M.yard, 56, 74, -92, -4, 0.215, 5, 9);
+    // 场内水泥分区（配料场院：覆盖北移后的三座筒仓、TMR 车间与双联青贮窖）
+    flatRound(kit, M.yard, 60, 96, -93, -30, 0.215, 5, 9);
     // 生产区：六栋牛舍下面铺压实土
     flatRound(kit, M.compact, 156, 76, 24, -46, 0.206, 8, 9);
     // 日粮道（两排牛舍之间）压回混凝土
@@ -260,25 +398,107 @@ import { FL } from './fl.js';
 
   function buildRoads(kit, M, world) {
     for (const r of L.roads) {
-      kit.add(ribbonGeo(r.pts, r.width + 1.7, 0.135, { uv: 10 }), M.curb);
+      kit.add(ribbonGeo(r.pts, r.width + 1.5, 0.135, { uv: 10 }), M.curb);
       kit.add(ribbonGeo(r.pts, r.width, 0.225, { uv: 12 }), M.asphalt);
-      // 边线
-      const eo = r.width / 2 - 0.55;
-      kit.add(ribbonGeo(r.pts, 0.16, 0.238, { offset: eo, uv: 6 }), M.line);
-      kit.add(ribbonGeo(r.pts, 0.16, 0.238, { offset: -eo, uv: 6 }), M.line);
+      // 道路边缘白线（在路口及倒角范围自动断开，绝不穿插！）
+      const eo = r.width / 2 - 0.50;
+      clippedLineRibbon(kit, M.line, r.pts, 0.16, 0.240, eo, -0.15);
+      clippedLineRibbon(kit, M.line, r.pts, 0.16, 0.240, -eo, -0.15);
+      // 道路中线：主干道双黄实线 / 支路黄虚线
+      if (r.centerStyle === 'double') {
+        clippedLineRibbon(kit, M.yellow, r.pts, 0.13, 0.241, 0.14, 0.2);
+        clippedLineRibbon(kit, M.yellow, r.pts, 0.13, 0.241, -0.14, 0.2);
+      } else if (r.centerStyle === 'dash') {
+        dashLine(kit, M.yellow, r.pts, 0.16, 2.4, 4.8, 0.241);
+      }
     }
+    // 标准正交路口核心方片（与两路宽度完全一致，零外凸）+ 真实内凹圆角倒角（Concave Fillets）
     for (const j of L.junctions) {
-      flatRound(kit, M.asphalt, j.w, j.d, j.x, j.z, 0.222, Math.min(j.w, j.d) * 0.3, 12);
+      flatRound(kit, M.curb, j.w + 1.5, j.d + 1.5, j.x, j.z, 0.134, 0.6, 10);
+      flatRound(kit, M.asphalt, j.w, j.d, j.x, j.z, 0.226, 0.2, 12);
+      const R = j.r || 2.8;
+      for (const f of (j.fillets || [])) {
+        concaveFillet(kit, M, j.x, j.z, j.w * 0.5, j.d * 0.5, f[0], f[1], R);
+      }
     }
-    // 中线虚线
-    dashLine(kit, M.yellow, L.roads[0].pts, 0.18, 2.4, 5.5, 0.24);
-    dashLine(kit, M.yellow, L.roads[2].pts, 0.18, 2.4, 5.5, 0.24);
-    dashLine(kit, M.yellow, L.roads[3].pts, 0.18, 2.4, 5.5, 0.24);
 
-    // 地磅前导向
+    // 路口停止线（Stop Bars）
+    const stopBars = [
+      // 西大门前 & 地磅前
+      [-122.6, 56, 0.36, 10.2],
+      [-92.2, 56, 0.36, 10.2],
+      // 西干道 × 南干道
+      [-49.5, 48, 0.36, 8.8],
+      [-58, 39.8, 9.6, 0.36],
+      // 青贮支路 & TMR 南支路汇入西干道
+      [-66.5, -4, 0.34, 7.4],
+      [-66.2, -26, 0.34, 7.0],
+      // 西干道 × 中央日粮道十字路口
+      [-49.5, -44, 0.36, 9.4],
+      [-66.5, -44, 0.34, 7.2],
+      [-58, -35.8, 9.6, 0.36],
+      [-58, -52.2, 9.6, 0.36],
+      // 中央日粮道汇入东干道
+      [103.5, -44, 0.36, 9.4],
+      // 东干道 × 南干道 & 东南出园大门前停止线
+      [103.5, 48, 0.36, 8.8],
+      [112, 39.8, 9.6, 0.36],
+      [112, 56.2, 9.6, 0.36],
+      [112, 83.2, 10.0, 0.36],
+    ];
+    for (const s of stopBars) {
+      U.box(kit, M.line, s[2], 0.022, s[3], s[0], 0.242, s[1]);
+    }
+    // 东北封闭拐角 (112, -84) 外侧白边收口线（北缘与东缘直角闭合）
+    U.box(kit, M.line, 10.2, 0.020, 0.16, 112.0, 0.240, -89.0);
+    U.box(kit, M.line, 0.16, 0.020, 10.2, 117.0, 0.240, -84.0);
+
+    // 人行横道斑马线（办公楼前、交易大厅接驳口、交易区-配料区通道）
+    function crosswalk(cx, cz, len, w, alongZ) {
+      const n = Math.max(4, Math.round(w / 1.15));
+      for (let i = 0; i < n; i++) {
+        const off = -w / 2 + (i + 0.5) * (w / n);
+        if (alongZ) {
+          U.box(kit, M.line, len, 0.022, 0.48, cx, 0.242, cz + off);
+        } else {
+          U.box(kit, M.line, 0.48, 0.022, len, cx + off, 0.242, cz);
+        }
+      }
+    }
+    crosswalk(12, 48, 2.8, 8.6, true);      // 办公楼北广场过街斑马线
+    crosswalk(-20, 40.0, 6.8, 2.8, false);  // 交易大厅接驳口横向斑马线
+    crosswalk(-58, 12, 8.8, 2.8, false);    // 交易区-配料区横道线
+
+    // 地面导向箭头
+    function laneArrow(x, z, rotY) {
+      const m = U.mat4(x, 0.243, z, 0, rotY, 0);
+      const shaft = new THREE.BoxGeometry(0.32, 0.018, 2.2);
+      shaft.applyMatrix4(U.mat4(0, 0, -0.4));
+      shaft.applyMatrix4(m);
+      kit.add(shaft, M.line);
+      const head = new THREE.ConeGeometry(0.68, 1.35, 3);
+      head.rotateX(Math.PI / 2);
+      head.rotateY(Math.PI / 6);
+      head.scale(1, 0.02, 1);
+      head.applyMatrix4(U.mat4(0, 0, 1.15));
+      head.applyMatrix4(m);
+      kit.add(head, M.line);
+    }
+    laneArrow(-100, 58.6, Math.PI / 2);     // 进场东行
+    laneArrow(-55.4, 24, Math.PI);          // 西干道北行
+    laneArrow(-55.4, -15, Math.PI);         // 西干道北行
+    laneArrow(20, -84, Math.PI / 2);        // 北环道东行
+    laneArrow(114.6, 12, 0);                // 东干道南行出场
+    laneArrow(114.6, 72, 0);                // 东干道南行出场
+    laneArrow(35, 50.4, Math.PI / 2);       // 南干道东行
+    laneArrow(-4, -46.8, Math.PI / 2);      // 日粮道北侧东行
+    laneArrow(54, -41.2, -Math.PI / 2);     // 日粮道南侧西返
+    laneArrow(-72, -4, -Math.PI / 2);       // 青贮支路西进
+
+    // 地磅前导向标线
     const wb = L.slots.weighbridge;
-    for (let i = 0; i < 7; i++) {
-      U.box(kit, M.yellow, 3.4, 0.02, 0.34, wb.x - 15, 0.242, wb.z - 6 + i * 2, 0, 0, 0);
+    for (let i = 0; i < 6; i++) {
+      U.box(kit, M.yellow, 2.4, 0.022, 0.28, wb.x - 13.8, 0.242, wb.z - 4.5 + i * 1.8, 0, 0, 0);
     }
   }
 
@@ -388,18 +608,59 @@ import { FL } from './fl.js';
     }
   }
 
+  /* ---------------- 园区外周界高辨识度实体围墙（底座 + 浅石材墙身 + 深灰壁柱压顶 + 顶部防攀栏杆） ---------------- */
+  function perimeterWallSeg(kit, M, x1, z1, x2, z2) {
+    const dx = x2 - x1, dz = z2 - z1;
+    const len = Math.hypot(dx, dz);
+    if (len < 0.2) return;
+    const ang = Math.atan2(dx, dz);
+    const mx = (x1 + x2) * 0.5, mz = (z1 + z2) * 0.5;
+
+    // 1. 混凝土加厚基座 + 浅灰白实体预制墙身 + 顶部深灰压顶梁（总实墙高 2.52m，俯瞰清晰醒目）
+    U.box(kit, M.concreteTrough, 0.78, 0.44, len + 0.2, mx, 0.22, mz, 0, ang, 0);
+    U.box(kit, M.wall,           0.40, 1.92, len,       mx, 1.40, mz, 0, ang, 0);
+    U.box(kit, M.steel,          0.56, 0.18, len + 0.1, mx, 2.45, mz, 0, ang, 0);
+    // 2. 顶部双道深钢防护横栏（总高 3.16m，既有通透层次又明确界定园区边界）
+    U.box(kit, M.steel, 0.09, 0.08, len, mx, 2.82, mz, 0, ang, 0);
+    U.box(kit, M.steel, 0.10, 0.09, len, mx, 3.12, mz, 0, ang, 0);
+
+    // 3. 每隔 ~6.5m 设一根粗壮深灰壁柱 + 浅色柱帽，中间穿插细立杆增强立体韵律
+    const bays = Math.max(1, Math.round(len / 6.5));
+    for (let k = 0; k <= bays; k++) {
+      const t = k / bays;
+      const px = x1 + dx * t, pz = z1 + dz * t;
+      U.box(kit, M.wallDark,       0.60, 3.18, 0.60, px, 1.62, pz, 0, ang, 0);
+      U.box(kit, M.concreteTrough, 0.76, 0.18, 0.76, px, 3.26, pz, 0, ang, 0);
+      if (k < bays) {
+        for (let m = 1; m <= 2; m++) {
+          const tt = (k + m / 3) / bays;
+          U.box(kit, M.steel, 0.08, 0.68, 0.08, x1 + dx * tt, 2.82, z1 + dz * tt, 0, ang, 0);
+        }
+      }
+    }
+  }
+
   function buildFences(kit, M) {
-    const h = 1.9;
-    // 园区周界（留出入口与出场通道）
-    fenceLine(kit, M.steel, [[-124, -92], [-124, 46]], h, 2);
-    fenceLine(kit, M.steel, [[-124, 66], [-124, 90]], h, 2);
-    fenceLine(kit, M.steel, [[-124, 90], [104, 90]], h, 2);
-    fenceLine(kit, M.steel, [[124, 90], [124, -92]], h, 2);
-    fenceLine(kit, M.steel, [[-124, -92], [104, -92]], h, 2);
-    fenceLine(kit, M.steel, [[124, -92], [124, -92.001]], h, 2);
-    // 大门段围栏（从门柱向两侧）
-    fenceLine(kit, M.steel, [[-124, 46], [-109, 46]], h, 2);
-    fenceLine(kit, M.steel, [[-109, 66], [-124, 66]], h, 2);
+    // 园区最外圈全封闭现代实体围墙（仅保留西进场大门与东南出园大门两个出入口，东北原路口完全封闭！）
+    // 西墙（分北段与南段，并向内折接西大门门柱 x = -117）
+    perimeterWallSeg(kit, M, -124, -92, -124, 48.5);
+    perimeterWallSeg(kit, M, -124, 48.5, -117, 48.5);
+    perimeterWallSeg(kit, M, -117, 63.5, -124, 63.5);
+    perimeterWallSeg(kit, M, -124, 63.5, -124, 90);
+    // 北墙（从西北角直通东北角全程封严，彻底封死原东北敞口！）
+    perimeterWallSeg(kit, M, -124, -92, 124, -92);
+    // 东墙（从东北角直通东南角，无缝接东南出园大门东翼墙）
+    perimeterWallSeg(kit, M, 124, -92, 124, 90);
+    // 南墙（从西南角直达东南出园大门西翼墙 x = 102.0）
+    perimeterWallSeg(kit, M, -124, 90, 102.0, 90);
+
+    // 四角标志性加重角柱（强化园区轮廓边界感）
+    for (const [cx, cz] of [[-124, -92], [124, -92], [124, 90], [-124, 90]]) {
+      U.box(kit, M.wallDark,       1.05, 3.55, 1.05, cx, 1.80, cz);
+      U.box(kit, M.concreteTrough, 1.24, 0.22, 1.24, cx, 3.64, cz);
+      U.box(kit, M.warmGlow,       0.42, 0.24, 0.42, cx, 3.86, cz);
+    }
+
     // 装车围栏
     fenceLine(kit, M.steel, [[97, -62], [97, -76]], 1.65, 3, 2.0);
     fenceLine(kit, M.steel, [[108, -76], [108, -62]], 1.65, 3, 2.0);
@@ -408,8 +669,6 @@ import { FL } from './fl.js';
     // 赶牛通道
     fenceLine(kit, M.steel, [[96, -65], [101, -65]], 1.6, 3, 2.0);
     fenceLine(kit, M.steel, [[96, -68], [101, -68]], 1.6, 3, 2.0);
-    // 青贮窖围栏
-    fenceLine(kit, M.steel, [[-110, 30.6], [-84, 30.6]], 1.2, 2, 3.2);
   }
 
   /* ---------------- 树木 ---------------- */
@@ -457,10 +716,10 @@ import { FL } from './fl.js';
   function buildProps(kit, M, world) {
     const rand = U.rng(20240);
 
-    // 灯杆
+    // 灯杆（避开西大门消毒通道、地磅棚与路口边界）
     const poles = [
-      [-100, 44, 9.2, -Math.PI / 2, true],
-      [-66, 58, 8.8, Math.PI, false],
+      [-104, 42, 9.2, -Math.PI / 2, true],
+      [-64, 63, 8.8, Math.PI, false],
       [108, 18, 9.2, -Math.PI / 2, true],
       [56, 62, 8.8, Math.PI, false],
       [4, -88, 9.0, 0, false],
@@ -472,38 +731,12 @@ import { FL } from './fl.js';
     ];
     for (const p of poles) lampPole(kit, M, world, p[0], p[1], p[2], p[3], p[4]);
 
-    // 场内景观小树丛（外围由 Blender 自然树木组团环绕，场内只留少量点缀）
-    const trees = [
-      [-116, 80, 0.95, 'broad'], [-108, 84, 0.85, 'broad'],
-      [-26, 78, 0.90, 'broad'], [34, 78, 0.90, 'broad'],
-      [118, 66, 0.95, 'broad'], [118, -88, 0.95, 'broad'],
-    ];
-    for (const t of trees) tree(kit, M, t[0], t[1], t[2], 'broad', rand);
-
-    // 料场杂物：油桶 / 托盘
+    // 料场杂物：油桶 / 托盘（靠西侧料棚边摆放整齐）
     for (let i = 0; i < 6; i++) {
-      U.cyl(kit, i % 2 ? M.red : M.blue, 0.42, 0.42, 1.1, 12, -110 + (i % 3) * 1.1, 0.72, 5 + Math.floor(i / 3) * 1.1);
+      U.cyl(kit, i % 2 ? M.red : M.blue, 0.42, 0.42, 1.1, 12, -112 + (i % 3) * 1.1, 0.72, -29 + Math.floor(i / 3) * 1.1);
     }
-    U.box(kit, M.timberLight, 2.4, 0.35, 2.0, -114, 0.4, 16, 0, 0.2, 0);
-    U.box(kit, M.timberLight, 2.4, 0.35, 2.0, -114, 0.75, 16.2, 0, -0.12, 0);
-
-    // 青贮窖西侧草捆
-    for (let i = 0; i < 4; i++) {
-      const r = 0.9;
-      const g = new THREE.CylinderGeometry(r, r, 1.5, 12);
-      kit.add(g, M.tarp, U.mat4(-116, 0.98, 10 + i * 2.1, 0, 0, Math.PI / 2));
-    }
-
-    // 综合楼前旗杆
-    U.cyl(kit, M.steelLight, 0.06, 0.08, 11, 6, -96, 5.6, 82);
-    U.box(kit, M.red, 2.2, 1.4, 0.04, -97.2, 9.6, 82, 0, 0, 0);
-
-    // 地磅两侧防撞柱
-    for (const sx of [-1, 1]) {
-      for (const sz of [-1, 1]) {
-        U.cyl(kit, M.yellow, 0.16, 0.16, 1.0, 8, -84 + sx * 11, 0.6, 56 + sz * 5.2);
-      }
-    }
+    U.box(kit, M.timberLight, 2.4, 0.35, 2.0, -116, 0.4, -27, 0, 0.15, 0);
+    U.box(kit, M.timberLight, 2.4, 0.35, 2.0, -116, 0.75, -26.8, 0, -0.08, 0);
 
     // 装车区坡道护栏
     U.box(kit, M.yellow, 12, 0.08, 0.12, 103, 1.4, -76.3, 0, 0, 0);
@@ -558,10 +791,10 @@ import { FL } from './fl.js';
   }
 
   const LABEL_POS = {
-    gate: [-107, 13.5, 56],
-    weigh: [-84, 11.8, 56],
+    gate: [-112, 13.5, 56],
+    weigh: [-80, 12.6, 56],
     sort: [-48, 13.2, -62],
-    tmr: [-100, 17.5, 4],
+    tmr: [-96, 19.2, -26],
     feed: [26, 14.5, -45],
     load: [106, 12.6, -66],
   };
@@ -619,8 +852,10 @@ import { FL } from './fl.js';
     scene.add(fill.target);
 
     const pts = [
-      [-84, 8.0, 56, 0xffb878, 420, 62],
-      [-88, 5.6, -6, 0xffa25e, 200, 42],
+      [-80, 5.4, 56, 0xffbe7e, 260, 48],
+      [-104.5, 5.1, 56, 0x9ce2ff, 150, 34],
+      [-81, 6.2, -38, 0xffa862, 240, 46],
+      [-84, 7.2, -4, 0xffc078, 150, 38],
       [-20, 5.2, -58, 0xffb066, 95, 34],
       [28, 5.2, -58, 0xffb066, 95, 34],
       [76, 5.2, -58, 0xffb066, 95, 34],
@@ -628,6 +863,8 @@ import { FL } from './fl.js';
       [28, 5.2, -32, 0xffb066, 95, 34],
       [76, 5.2, -32, 0xffb066, 95, 34],
       [106, 5.0, -69, 0xffb878, 150, 36],
+      [-26, 6.2, 1, 0xffe2be, 260, 36],
+      [-14, 6.2, 1, 0xffe2be, 260, 36],
     ];
     world.pointLights = [];
     for (const p of pts) {

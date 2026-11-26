@@ -39,7 +39,7 @@ import { FL } from './fl.js';
     const dPad = Math.hypot(dx, dz);
     if (dPad <= 0) return Y_NEAR;
 
-    // 进场/出场道路走廊也压平
+    // 进场/出场道路走廊压平（东北原开口已封闭）
     const nearWestRoad = wx < -120 && Math.abs(wz - (56 + (-wx - 127) * 0.13)) < 38;
     const nearEastRoad = wz > 90 && Math.abs(wx - (112 + (wz - 96) * 0.08)) < 34;
     let mask = U.smoothstep(0, 180, dPad);
@@ -273,7 +273,7 @@ import { FL } from './fl.js';
     ctx.lineWidth = Math.max(0.8, (S / span) * 0.9);
     ctx.stroke();
 
-    const n0 = P(112, 96), n1 = P(116, 200), n2 = P(128, 420), n3 = P(168, 760);
+    const n0 = P(112, 95), n1 = P(115, 200), n2 = P(128, 420), n3 = P(168, 760);
     ctx.strokeStyle = '#4e4b45';
     ctx.lineWidth = Math.max(2.4, (S / span) * 11);
     ctx.beginPath();

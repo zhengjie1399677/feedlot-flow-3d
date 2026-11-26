@@ -244,11 +244,11 @@ function boot() {
         let d = ((tmrVeh.s - p.sFeed) % L + L) % L;
         const target = Math.max(0, Math.min(1, 1.06 - (d / L) * 1.45));
         p.show = p.show < 0 ? target : p.show + (target - p.show) * Math.min(1, dt * 2.2);
-        p.mesh.scale.y = 0.62 + p.show * 0.5;
+        p.mesh.scale.y = 0.58 + p.show * 0.54;
       }
     }
 
-    // 大门道闸：有车接近就抬杆
+    // 大门道闸（西进场大门 + 东南出园大门）：有车接近就自动抬杆
     if (world.gateArm) {
       const gp = world.gatePoint;
       let near = 1e9;
@@ -260,6 +260,18 @@ function boot() {
       const want = near < 19 ? 1.28 : 0.0;
       const cur = world.gateArm.rotation.x;
       world.gateArm.rotation.x = cur + (want - cur) * Math.min(1, dt * 3.2);
+    }
+    if (world.exitGateArm) {
+      const ep = world.exitGatePoint;
+      let near = 1e9;
+      for (let i = 0; i < fleet.list.length; i++) {
+        const v = fleet.list[i];
+        const d = Math.hypot(v.x - ep.x, v.z - ep.z);
+        if (d < near) near = d;
+      }
+      const want = near < 20 ? 1.28 : 0.0;
+      const cur = world.exitGateArm.rotation.z;
+      world.exitGateArm.rotation.z = cur + (want - cur) * Math.min(1, dt * 3.2);
     }
 
     ui.update(hour, fleet.stageSet(), phase);

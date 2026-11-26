@@ -669,13 +669,13 @@ import { FL } from './fl.js';
     return t;
   };
 
-  U.signMaterial = function (tex, opacity, additive) {
+  U.signMaterial = function (tex, opacity, additive, doubleSide) {
     return new THREE.MeshBasicMaterial({
       map: tex,
       transparent: true,
       opacity: opacity == null ? 1 : opacity,
       depthWrite: false,
-      side: THREE.DoubleSide,
+      side: doubleSide ? THREE.DoubleSide : THREE.FrontSide,
       toneMapped: false,
       blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
       polygonOffset: true,
