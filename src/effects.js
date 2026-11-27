@@ -546,15 +546,21 @@ import { FL } from './fl.js';
       return ride.active ? exitRide() : enterRide(null);
     }
 
-    const clampPhi = (v) => Math.max(0.36, Math.min(1.2, v));
-    const clampDist = (v) => Math.max(base / 7, Math.min(base * 1.75, v));
+    const MIN_CAM_Y = 1.10;
+    function maxPhiFor(dist, targetY) {
+      const d = Math.max(0.5, dist);
+      const cosMin = Math.max(-1, Math.min(1, (MIN_CAM_Y - targetY) / d));
+      return Math.min(1.76, Math.acos(cosMin));
+    }
+    const clampPhi = (v, d, ty) => Math.max(0.18, Math.min(maxPhiFor(d == null ? goal.dist : d, ty == null ? goal.target.y : ty), v));
+    const clampDist = (v) => Math.max(2.4, Math.min(base * 1.75, v));
 
-    // 自由视角：允许把镜头中心挪到地块上任意位置（夹在地块范围内）
-    const PAN_X = 118, PAN_Z = 92;
+    // 自由视角：允许把镜头中心挪到园区任意位置（含扩大停车场与室内大厅）
+    const PAN_X = 132, PAN_Z = 104;
     function clampTarget(t) {
       t.x = Math.max(-PAN_X, Math.min(PAN_X, t.x));
       t.z = Math.max(-PAN_Z, Math.min(PAN_Z, t.z));
-      t.y = Math.max(0, Math.min(16, t.y));
+      t.y = Math.max(0.9, Math.min(16, t.y));
       return t;
     }
     // du 沿屏幕右、dv 沿屏幕里（都以米为单位）
@@ -572,10 +578,20 @@ import { FL } from './fl.js';
     }
 
     function place() {
+      // 近景/进入室内时自动收紧 near 平面防裁切、并柔和放宽广角视野；远景恢复远裁与原焦距保深度精度
+      const wantNear = U.clamp(state.dist * 0.014, 0.20, orbitNear);
+      const indoorT = U.smoothstep(28, 8, state.dist);
+      const wantFov = orbitFov + (56 - orbitFov) * indoorT;
+      if (Math.abs(camera.near - wantNear) > 0.005 || Math.abs(camera.fov - wantFov) > 0.02) {
+        camera.near = wantNear;
+        camera.fov = wantFov;
+        camera.updateProjectionMatrix();
+      }
       const sp = Math.sin(state.phi);
+      const camY = Math.max(MIN_CAM_Y, state.target.y + state.dist * Math.cos(state.phi));
       camera.position.set(
         state.target.x + state.dist * sp * Math.sin(state.theta),
-        state.target.y + state.dist * Math.cos(state.phi),
+        camY,
         state.target.z + state.dist * sp * Math.cos(state.theta)
       );
       camera.lookAt(state.target);
@@ -615,6 +631,7 @@ import { FL } from './fl.js';
         }
         if (pinchDist > 0) {
           goal.dist = clampDist(goal.dist * (pinchDist / Math.max(1, d)));
+          goal.phi = clampPhi(goal.phi);
         }
         pinchDist = d;
         const mid = { x: (p[0].x + p[1].x) / 2, y: (p[0].y + p[1].y) / 2 };
@@ -657,6 +674,7 @@ import { FL } from './fl.js';
         ride.goalFov = clampFov(ride.goalFov + e.deltaY * 0.02);
       } else {
         goal.dist = clampDist(goal.dist * Math.pow(1.0016, e.deltaY));
+        goal.phi = clampPhi(goal.phi);
       }
       lastInteract = performance.now();
     }
@@ -684,9 +702,10 @@ import { FL } from './fl.js';
         const p = presets.find((x) => x.id === id) || presets[0];
         currentPreset = p.id;
         goal.theta = p.theta;
-        goal.phi = p.phi;
-        goal.dist = base / p.zoom;
+        goal.dist = p.dist != null ? clampDist(p.dist) : clampDist(base / p.zoom);
         goal.target.set(p.target[0], p.target[1], p.target[2]);
+        clampTarget(goal.target);
+        goal.phi = clampPhi(p.phi, goal.dist, goal.target.y);
         if (instant) {
           state.theta = goal.theta; state.phi = goal.phi; state.dist = goal.dist;
           state.target.copy(goal.target);
@@ -708,14 +727,22 @@ import { FL } from './fl.js';
           return;
         }
         if (keys.size) {
-          let du = 0, dv = 0;
+          let du = 0, dv = 0, dy = 0;
           if (keys.has('l')) du -= 1;
           if (keys.has('r')) du += 1;
           if (keys.has('u')) dv += 1;
           if (keys.has('d')) dv -= 1;
+          if (keys.has('up')) dy += 1;
+          if (keys.has('dn')) dy -= 1;
           if (du || dv) {
-            const speed = goal.dist * 0.55 * dt;
+            const speed = Math.max(5.5, goal.dist * 0.55) * dt;
             panWorld(du * speed, dv * speed);
+          }
+          if (dy) {
+            goal.target.y += dy * Math.max(3.5, goal.dist * 0.25) * dt;
+            clampTarget(goal.target);
+            goal.phi = clampPhi(goal.phi);
+            lastInteract = performance.now();
           }
         }
         if (!dragging && (Math.abs(vTheta) + Math.abs(vPhi)) > 0.00001) {
@@ -750,7 +777,7 @@ import { FL } from './fl.js';
         return rideList.map(function (it) { return { id: it.id, label: it.label, en: it.en }; });
       },
     };
-    const PAN_KEYS = { arrowleft: 'l', a: 'l', arrowright: 'r', d: 'r', arrowup: 'u', w: 'u', arrowdown: 'd', s: 'd' };
+    const PAN_KEYS = { arrowleft: 'l', a: 'l', arrowright: 'r', d: 'r', arrowup: 'u', w: 'u', arrowdown: 'd', s: 'd', e: 'up', q: 'dn' };
     window.addEventListener('keydown', (e) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const k = e.key.toLowerCase();

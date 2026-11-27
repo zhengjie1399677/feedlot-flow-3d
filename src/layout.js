@@ -6,15 +6,15 @@ import { FL } from './fl.js';
  * ============================================================ */
 
   const L = (FL.LAYOUT = {
-    plot: { x0: -127, x1: 127, z0: -99, z1: 95 },
-    slab: { w: 254, d: 194, cx: 0, cz: -2 },
+    plot: { x0: -137, x1: 137, z0: -104, z1: 108 },
+    slab: { w: 274, d: 212, cx: 0, cz: 2 },
 
     roads: [
       {
         id: 'entry',
         width: 11.5,
         centerStyle: 'double',
-        pts: [[-128, 56], [-108, 56], [-84, 56], [-58, 56]],
+        pts: [[-138, 56], [-108, 56], [-84, 56], [-58, 56]],
       },
       {
         id: 'west',
@@ -26,7 +26,7 @@ import { FL } from './fl.js';
         id: 'east',
         width: 11,
         centerStyle: 'double',
-        pts: [[112, -84], [112, -68], [112, -44], [112, 10], [112, 48], [112, 96]],
+        pts: [[112, -84], [112, -68], [112, -44], [112, 10], [112, 48], [112, 108]],
       },
       {
         id: 'south',
@@ -60,15 +60,15 @@ import { FL } from './fl.js';
       },
       {
         id: 'tradingAccess',
-        width: 8.0,
+        width: 8.6,
         centerStyle: 'none',
-        pts: [[-20, 48], [-20, 41], [-20, 34]],
+        pts: [[-25, 48], [-25, 41], [-25, 33]],
       },
       {
         id: 'parkingAccess',
         width: 7.2,
         centerStyle: 'none',
-        pts: [[77, 48], [77, 43], [77, 38.5]],
+        pts: [[71, 48], [71, 53], [71, 58.6]],
       },
     ],
 
@@ -91,10 +91,10 @@ import { FL } from './fl.js';
       { x: 112, z: -84, w: 11.0, d: 11.0, r: 3.2, fillets: [[-1, 1]] },
       // 南干道(z=48) 接 东干道(x=112) T 字路口
       { x: 112, z: 48, w: 11.0, d: 10.0, r: 3.2, fillets: [[-1, -1], [-1, 1]] },
-      // 交易大厅支路(x=-20) 接 南干道(z=48)
-      { x: -20, z: 48, w: 8.0, d: 10.0, r: 2.6, fillets: [[-1, -1], [1, -1]] },
-      // 停车场支路(x=77) 接 南干道(z=48)
-      { x: 77, z: 48, w: 7.2, d: 10.0, r: 2.4, fillets: [[-1, -1], [1, -1]] },
+      // 交易大厅支路(x=-25) 接 南干道(z=48)
+      { x: -25, z: 48, w: 8.6, d: 10.0, r: 2.6, fillets: [[-1, -1], [1, -1]] },
+      // 停车场支路(x=71) 接 南干道(z=48)，向南接入综合楼东侧停车场
+      { x: 71, z: 48, w: 7.2, d: 10.0, r: 2.4, fillets: [[-1, 1], [1, 1]] },
     ],
 
     slots: {
@@ -104,7 +104,7 @@ import { FL } from './fl.js';
       tmrBay: { x: -80.8, z: -38 },
       unloading: { x: -55, z: -66 },
       dock: { x: 112, z: -69 },
-      exitGate: { x: 112, z: 89.5 },
+      exitGate: { x: 112, z: 103.5 },
     },
 
     barns: [
@@ -121,13 +121,13 @@ import { FL } from './fl.js';
     /* 场区中部（生产区以南，用围墙隔开）：交易中心 / 员工办公 / 精简生态停车场 */
     market: {
       wall: { z: -11, x0: -50, x1: 104, gates: [[-48, -38]], walkGate: [58, 61.5] },
-      hall: { cx: -20, cz: 2, w: 34, d: 18 },
+      hall: { cx: -25, cz: 6, w: 44, d: 26 },
       pens: { x0: 2, z0: -9, cols: 3, rows: 2, w: 8.4, d: 7.4, gx: 1.8, gz: 1.8 },
       ramp: { x: 33.5, z: 2 },
       scale: { x: 40, z: 16 },
-      parking: { x0: 56, x1: 98, z0: 25, z1: 39, aisle: 5.0, stall: 3.0 },
-      office: { cx: 12, cz: 72, w: 44, d: 13.6, rot: 0 },
-      workshop: { cx: 92, cz: 26 },
+      parking: { x0: 44, x1: 101, z0: 58, z1: 96, aisle: 6.2, stall: 3.0 },
+      office: { cx: 12, cz: 72, w: 44, d: 13.6, rot: Math.PI },
+      forageYard: { cx: 77, cz: 17, w: 50, d: 44, shedCx: 77, shedCz: 9, shedW: 42, shedD: 24 },
     },
 
     colors: {
@@ -141,7 +141,11 @@ import { FL } from './fl.js';
     /* 车辆路线：stage 用于联动底部流程条；stop 为停顿时长（秒） */
     routes: {
       cattleTruck: [
-        { x: -144, z: 56, stage: 'gate' },
+        { x: -215, z: 138, stage: 'gate' },
+        { x: -168, z: 138, stage: 'gate' },
+        { x: -160, z: 130, stage: 'gate' },
+        { x: -160, z: 64, stage: 'gate' },
+        { x: -152, z: 56, stage: 'gate' },
         { x: -124, z: 56, stage: 'gate' },
         { x: -117, z: 56, stage: 'gate', label: '驶入大门' },
         { x: -104, z: 56, stage: 'gate', label: '雾化消毒' },
@@ -165,12 +169,18 @@ import { FL } from './fl.js';
         { x: 113.5, z: -40, stage: null },
         { x: 113.5, z: 0, stage: null },
         { x: 113.5, z: 48, stage: null },
-        { x: 113.5, z: 86, stage: null },
-        { x: 114, z: 106, stage: null },
+        { x: 113.5, z: 100, stage: null },
+        { x: 113.5, z: 130, stage: null },
+        { x: 121, z: 138, stage: null },
+        { x: 210, z: 138, stage: null },
       ],
 
       forageTruck: [
-        { x: -146, z: 56, stage: 'gate' },
+        { x: -220, z: 138, stage: 'gate' },
+        { x: -168, z: 138, stage: 'gate' },
+        { x: -160, z: 130, stage: 'gate' },
+        { x: -160, z: 64, stage: 'gate' },
+        { x: -152, z: 56, stage: 'gate' },
         { x: -124, z: 56, stage: 'gate' },
         { x: -117, z: 56, stage: 'gate', label: '草料车进场' },
         { x: -104, z: 56, stage: 'gate', label: '雾化消毒' },
@@ -194,11 +204,18 @@ import { FL } from './fl.js';
         { x: -56, z: 49.5, stage: null },
         { x: -20, z: 49.8, stage: null },
         { x: 30, z: 49.8, stage: null },
-        { x: 80, z: 49.8, stage: null },
-        { x: 106, z: 49.8, stage: null },
-        { x: 112.5, z: 55, stage: null },
-        { x: 113.5, z: 86, stage: null, label: '空车离场' },
-        { x: 114, z: 106, stage: null },
+        { x: 47, z: 49.8, stage: null },
+        { x: 51, z: 44, stage: null },
+        { x: 51, z: 37, stage: null },
+        { x: 58, z: 35.6, stage: null },
+        { x: 77, z: 35.6, stop: 4, stage: null, label: '草料库装车外销' },
+        { x: 96, z: 35.6, stage: null },
+        { x: 106, z: 37.5, stage: null },
+        { x: 112.5, z: 44, stage: null },
+        { x: 113.5, z: 100, stage: null, label: '满载出园外销' },
+        { x: 113.5, z: 130, stage: null },
+        { x: 121, z: 138, stage: null },
+        { x: 210, z: 138, stage: null },
       ],
 
       tmrTruck: [
@@ -235,7 +252,11 @@ import { FL } from './fl.js';
       ],
 
       outboundTruck: [
-        { x: -144, z: 56, stage: 'gate' },
+        { x: -215, z: 138, stage: 'gate' },
+        { x: -168, z: 138, stage: 'gate' },
+        { x: -160, z: 130, stage: 'gate' },
+        { x: -160, z: 64, stage: 'gate' },
+        { x: -152, z: 56, stage: 'gate' },
         { x: -124, z: 56, stage: 'gate' },
         { x: -117, z: 56, stage: 'gate', label: '待装卡车进场' },
         { x: -104, z: 56, stage: 'gate', label: '雾化消毒' },
@@ -259,8 +280,10 @@ import { FL } from './fl.js';
         { x: 112, z: -20, stage: 'load' },
         { x: 112, z: 15, stage: 'load' },
         { x: 112, z: 48, stage: 'load' },
-        { x: 112, z: 86, stage: 'load', label: '出园检疫放行' },
-        { x: 113, z: 108, stage: 'load' },
+        { x: 112, z: 100, stage: 'load', label: '出园检疫放行' },
+        { x: 112.5, z: 130, stage: 'load' },
+        { x: 121, z: 138, stage: 'load' },
+        { x: 210, z: 138, stage: 'load' },
       ],
     },
 
@@ -305,6 +328,7 @@ import { FL } from './fl.js';
       { id: 'tmr', label: '配料', target: [-94, 11, -34], theta: 0.62, phi: 0.90, zoom: 2.05 },
       { id: 'barn', label: '牛舍', target: [-16, 6, -54], theta: 0.15, phi: 0.95, zoom: 2.2 },
       { id: 'dock', label: '装车', target: [100, 5, -64], theta: 0.50, phi: 0.98, zoom: 2.7 },
+      { id: 'hall', label: '大厅内景', target: [-25.0, 3.2, -1.0], theta: -0.18, phi: 1.54, dist: 14.5 },
     ],
 
     stages: [

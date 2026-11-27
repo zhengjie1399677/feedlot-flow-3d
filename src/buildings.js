@@ -141,6 +141,7 @@ import { FL } from './fl.js';
     const mk = L.market;
     ao(world, mk.hall.w + 4.0, mk.hall.d + 4.0, mk.hall.cx, mk.hall.cz, 0.30);
     ao(world, mk.office.w + 4.5, mk.office.d + 4.5, mk.office.cx, mk.office.cz, 0.28);
+    if (mk.forageYard) ao(world, mk.forageYard.shedW + 5.0, mk.forageYard.shedD + 6.0, mk.forageYard.shedCx, mk.forageYard.shedCz + 1.0, 0.30);
   }
 
   /* ---------------- 自然散堆起伏 TMR 日粮垄几何（彻底替代直角绿方块） ---------------- */
@@ -561,10 +562,10 @@ import { FL } from './fl.js';
     const P = L.market.pens;
     const cx = Hh.cx, cz = Hh.cz;
 
-    // 交易广场浅灰铺装
-    U.box(kit, M.apron, 86, 0.08, 44, 0, 0.256, 12, 0, 0, 0, 1.6);
+    // 交易广场浅灰铺装（扩展覆盖 44×26m 草畜牧交易大厅全幅台基）
+    U.box(kit, M.apron, 96, 0.08, 46, -5, 0.256, 13, 0, 0, 0, 1.6);
 
-    // 加载 Blender 现代化落地玻璃交易结算大厅（内含 6 窗口电脑工位、签约洽谈区与电子行情大屏）
+    // 加载 Blender 44×26m 现代双层挑空「草畜牧交易大厅」（7 大功能区：中央阶梯竞价席、8 窗口结算台、草料实物展厅与质检台、玻璃签约室、咖啡洽谈区、二层观景连廊）
     loadBuildingGLB('models/trading_hall.glb', world, function (root) {
       root.position.set(cx, 0, cz);
       tuneGlbRoot(root, world);
@@ -573,27 +574,98 @@ import { FL } from './fl.js';
         const mn = o.material.name || '';
         if (/ClearGlass/i.test(mn)) {
           o.material.transparent = true;
-          o.material.opacity = 0.24;
+          o.material.opacity = 0.22;
           o.material.depthWrite = false;
+          o.material.side = THREE.DoubleSide;
           o.material.envMapIntensity = 1.5;
           o.castShadow = false;
         } else if (/FrostedGlass/i.test(mn)) {
           o.material.transparent = true;
-          o.material.opacity = 0.52;
+          o.material.opacity = 0.48;
           o.material.depthWrite = false;
+          o.material.side = THREE.DoubleSide;
           o.castShadow = false;
         }
       });
       world.group.add(root);
     });
 
-    // 单面正向嵌入南侧挑檐实体灯箱上的大厅标牌（FrontSide，绝不反字）
-    sign(world, '活牛交易结算大厅', 'LIVE CATTLE TRADING & SETTLEMENT HALL', 14.2, 1.45, cx, 8.52, cz + Hh.d / 2 + 4.10, 0, {
-      size: 82, subSize: 28, bg: 'rgba(14,19,24,0.94)', border: 'rgba(130,210,235,0.45)',
-      color: '#eef6fa', subColor: 'rgba(175,216,232,0.82)', doubleSide: false,
+    // 南侧门廊屋顶现代银灰灯箱正向标牌（严丝合缝嵌于 Blender 灯箱正面 z = cz + 18.25, y = 11.79，清爽银青配色无金色）
+    sign(world, '草畜牧交易大厅', 'FORAGE & LIVESTOCK TRADING HALL', 17.6, 2.20, cx, 11.79, cz + 18.25, 0, {
+      size: 68, subSize: 22, bg: 'rgba(14,20,27,0.95)', border: 'rgba(105,212,188,0.62)',
+      glow: 'rgba(115,220,205,0.22)', color: '#f2f7fa', subColor: 'rgba(176,222,226,0.88)', doubleSide: false,
     });
-    world.pools.push({ x: cx, z: cz + Hh.d / 2 + 4.5, size: 30, warm: 0.95 });
-    world.pools.push({ x: cx, z: cz, size: 28, warm: 0.85 });
+
+    // 室内北墙 18.2m 巨幅 LED 实时大宗行情显示屏（高分辨率 Canvas，进入大厅内景清晰可读！）
+    (function buildIndoorMarketBoard() {
+      const c = U.makeCanvas(1600, 400);
+      const ctx = c.getContext('2d');
+      const bg = ctx.createLinearGradient(0, 0, 1600, 400);
+      bg.addColorStop(0, '#081420');
+      bg.addColorStop(0.5, '#0d1f30');
+      bg.addColorStop(1, '#081420');
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, 1600, 400);
+      ctx.strokeStyle = 'rgba(108,210,192,0.58)';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(10, 10, 1580, 380);
+
+      // Header bar
+      ctx.fillStyle = 'rgba(72,176,162,0.16)';
+      ctx.fillRect(14, 14, 1572, 74);
+      ctx.fillStyle = '#eef7fb';
+      ctx.font = '700 38px "Microsoft YaHei","Bahnschrift",sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('草畜牧大宗交易实时行情中心 · LIVE MARKET QUOTES', 42, 64);
+      ctx.fillStyle = '#6cf0b0';
+      ctx.font = '600 24px "Bahnschrift","Microsoft YaHei",sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText('● 竞价交易进行中  今日成交 1,286 吨 / 218 头', 1556, 61);
+
+      // 4 Quote Cards
+      const cards = [
+        { name: '西门塔尔育肥牛', price: '32.80', unit: '元/kg', delta: '+1.8%', up: true, sub: '挂牌 268 头 · 均重 640kg' },
+        { name: '一级紫花苜蓿干草', price: '2,680', unit: '元/吨', delta: '+2.4%', up: true, sub: '蛋白 ≥18% · 现货 420 吨' },
+        { name: '优质燕麦干草方捆', price: '2,150', unit: '元/吨', delta: '+0.9%', up: true, sub: '含水 ≤14% · 现货 310 吨' },
+        { name: '全株玉米青贮裹包', price: '760', unit: '元/吨', delta: '-0.4%', up: false, sub: '淀粉 34% · 现货 680 吨' },
+      ];
+      cards.forEach((it, idx) => {
+        const x = 36 + idx * 388, y = 114, cw = 364, ch = 250;
+        ctx.fillStyle = 'rgba(16,34,50,0.88)';
+        ctx.fillRect(x, y, cw, ch);
+        ctx.strokeStyle = 'rgba(120,195,220,0.28)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x, y, cw, ch);
+        ctx.fillStyle = '#dceef8';
+        ctx.font = '600 28px "Microsoft YaHei",sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(it.name, x + 22, y + 48);
+        ctx.fillStyle = '#7ce4ff';
+        ctx.font = '700 58px "Bahnschrift","Microsoft YaHei",sans-serif';
+        ctx.fillText(it.price, x + 22, y + 132);
+        ctx.fillStyle = 'rgba(200,224,238,0.80)';
+        ctx.font = '500 22px "Microsoft YaHei",sans-serif';
+        ctx.fillText(it.unit, x + 212, y + 130);
+        ctx.fillStyle = it.up ? '#6ef2a4' : '#ff8a80';
+        ctx.font = '700 26px "Bahnschrift",sans-serif';
+        ctx.fillText((it.up ? '▲ ' : '▼ ') + it.delta, x + 22, y + 182);
+        ctx.fillStyle = 'rgba(175,208,226,0.74)';
+        ctx.font = '400 20px "Microsoft YaHei",sans-serif';
+        ctx.fillText(it.sub, x + 22, y + 224);
+      });
+
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = 8;
+      const mat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false });
+      const screenMesh = new THREE.Mesh(new THREE.PlaneGeometry(18.1, 4.30), mat);
+      screenMesh.position.set(cx, 5.65, cz - 12.00);
+      screenMesh.renderOrder = 4;
+      world.group.add(screenMesh);
+    })();
+
+    world.pools.push({ x: cx, z: cz + Hh.d / 2 + 6.8, size: 38, warm: 0.90 });
+    world.pools.push({ x: cx, z: cz, size: 36, warm: 0.85 });
 
     // 6 格待售活牛栏（突出活畜交易主体特征）
     const penX = P.x0, penZ = P.z0;
@@ -654,8 +726,8 @@ import { FL } from './fl.js';
     U.box(kit, M.wallCool, 2.6, 2.6, 2.4, SC.x + 6.4, 1.6, SC.z + 2.6);
     U.box(kit, M.glass, 2.0, 0.9, 0.1, SC.x + 6.4, 2.2, SC.z + 1.38);
 
-    // 广场照明路灯（去掉原广场中央突兀的方块花坛，保持交易大厅前场开阔整洁）
-    for (const lp of [[-32, 26], [16, 28], [32, 16]]) {
+    // 广场照明路灯（避开扩大后的草畜牧交易大厅前场，保持开阔整洁）
+    for (const lp of [[-38, 30], [16, 28], [32, 16]]) {
       U.cyl(kit, M.steel, 0.09, 0.12, 5.0, 8, lp[0], 2.7, lp[1]);
       U.box(kit, M.lamp, 0.85, 0.16, 0.55, lp[0], 5.2, lp[1]);
       glowSprite(world, 0xffd7a0, 2.4, lp[0], 5.2, lp[1], 0.8);
@@ -669,10 +741,13 @@ import { FL } from './fl.js';
   function buildStaffOffice(kit, M, world) {
     const O = L.market.office;
     const cx = O.cx, cz = O.cz;
+    const rot = O.rot || 0;
+    const flipped = Math.abs(rot - Math.PI) < 0.1;
+    const frontDir = flipped ? 1 : -1;
 
     loadBuildingGLB('models/office.glb', world, function (root) {
       root.position.set(cx, 0, cz);
-      root.rotation.y = O.rot || 0;
+      root.rotation.y = rot;
       tuneGlbRoot(root, world);
       // 保留玻璃/阳台护栏的柔和通透感，同时增强反射
       root.traverse(function (o) {
@@ -690,32 +765,31 @@ import { FL } from './fl.js';
     });
 
     // 楼顶实体灯箱正反双面单向标牌（FrontSide，绝不出现背面镜像反字！）
-    // Blender 灯箱位于 local x = -11.5, y = 0, z = 10.03（厚 0.46m），对应 Three.js (cx - 11.5, 10.03, cz ± 0.25)
-    const signX = cx - 11.5;
+    const signX = cx + (flipped ? 11.5 : -11.5);
     const signY = 10.03;
     const signCfg = {
       size: 74, subSize: 26, bg: 'rgba(18,23,28,0.94)', border: 'rgba(180,215,235,0.34)',
       color: '#f0f6fa', subColor: 'rgba(195,216,230,0.80)', doubleSide: false,
     };
     // 北面（面向主干道 -z）
-    sign(world, '草都草牧业股份有限公司', 'CAODU GRASS ANIMAL HUSBANDRY CO., LTD.', 14.8, 1.72, signX, signY, cz - 0.25, Math.PI, signCfg);
+    sign(world, '综合办公楼', 'COMPREHENSIVE OFFICE BUILDING', 14.8, 1.72, signX, signY, cz - 0.25, Math.PI, signCfg);
     // 南面（面向南侧全景机位 +z）
-    sign(world, '草都草牧业股份有限公司', 'CAODU GRASS ANIMAL HUSBANDRY CO., LTD.', 14.8, 1.72, signX, signY, cz + 0.25, 0, signCfg);
+    sign(world, '综合办公楼', 'COMPREHENSIVE OFFICE BUILDING', 14.8, 1.72, signX, signY, cz + 0.25, 0, signCfg);
 
-    // 北侧主入口广场（衔接 z=48 主干道南缘 z=53.5 到楼前主入口 z=65.2，平整落客区 + 旗阵）
-    U.box(kit, M.apron, 54, 0.14, 13.5, cx, 0.21, cz - 12.6, 0, 0, 0, 0.6);
+    // 主入口广场（随楼体朝向同步切换前后位置）
+    U.box(kit, M.apron, 54, 0.14, 13.5, cx, 0.21, cz + frontDir * 12.6, 0, 0, 0, 0.6);
     // 入口落客步道引导线
-    U.box(kit, M.apronEdge, 14, 0.04, 11.5, cx - 11.5, 0.285, cz - 12.6, 0, 0, 0, 0.2);
-    // 北广场东侧三根旗杆（立在办公区主入口东侧广场，不遮挡大门、面向主干道）
+    U.box(kit, M.apronEdge, 14, 0.04, 11.5, signX, 0.285, cz + frontDir * 12.6, 0, 0, 0, 0.2);
+    // 三根旗杆（立在主入口侧广场）
     for (const fx of [cx - 3.2, cx - 0.8, cx + 1.6]) {
-      const fz = cz - 15.2;
+      const fz = cz + frontDir * 15.2;
       U.cyl(kit, M.concreteTrough, 0.42, 0.50, 0.36, 12, fx, 0.38, fz);
       U.cyl(kit, M.steelLight, 0.06, 0.085, 9.2, 8, fx, 4.9, fz);
       U.box(kit, fx === cx - 0.8 ? M.red : M.blue, 1.45, 0.88, 0.05, fx + 0.74, 8.85, fz, 0, 0.18, 0);
     }
     // 入口与楼梯间夜间暖光池
-    world.pools.push({ x: cx - 11.5, z: cz - 9.8, size: 22, warm: 0.95 });
-    world.pools.push({ x: cx + 10.5, z: cz - 8.4, size: 14, warm: 0.75 });
+    world.pools.push({ x: signX, z: cz + frontDir * 9.8, size: 22, warm: 0.95 });
+    world.pools.push({ x: cx + (flipped ? -10.5 : 10.5), z: cz + frontDir * 8.4, size: 14, warm: 0.75 });
   }
 
   /* 静态停放的一台高栏活牛运输车（交易区装车坡道旁 · Blender Freightliner FL70 精模） */
@@ -735,55 +809,275 @@ import { FL } from './fl.js';
     ao(world, 13.4, 3.6, x, z, 0.32, rot);
   }
 
-  /* ---------------- 精简生态停车场（缩小面积 + 留出 45% 空位与绿化岛） ---------------- */
+  /* ---------------- 扩大生态停车场（57×38m 双通道四排车位 + 中央绿化灯带 + 光伏充电车棚） ---------------- */
   function buildParking(kit, M, world) {
     const P = L.market.parking;
     const st = P.stall || 3.0;
+    const w = P.x1 - P.x0;
+    const d = P.z1 - P.z0;
+    const midX = (P.x0 + P.x1) / 2;
     const midZ = (P.z0 + P.z1) / 2;
-    const aisle = P.aisle || 5.0;
-    const rowD = Math.min(4.8, (P.z1 - P.z0 - aisle) / 2);
-    const n = Math.floor((P.x1 - P.x0) / st);
 
-    // 铺装与绿化镶边
-    U.box(kit, M.asphalt, P.x1 - P.x0, 0.1, P.z1 - P.z0, (P.x0 + P.x1) / 2, 0.29, midZ, 0, 0, 0, 1.5);
-    for (let i = 0; i <= n; i++) {
-      const x = P.x0 + i * st;
-      U.box(kit, M.line, 0.12, 0.03, rowD - 0.5, x, 0.36, P.z0 + rowD / 2, 0, 0, 0, 0.02);
-      U.box(kit, M.line, 0.12, 0.03, rowD - 0.5, x, 0.36, P.z1 - rowD / 2, 0, 0, 0, 0.02);
-    }
+    // 1. 落地混凝土路缘台基（底 y=0.02 扎入草坪，顶 y=0.24 与沥青顶 y=0.34 拉开 10cm 彻底杜绝 Z-fighting 闪烁）
+    U.box(kit, M.curb, w + 1.6, 0.22, d + 1.6, midX, 0.13, midZ, 0, 0, 0, 1.8);
+    U.box(kit, M.asphalt, w, 0.12, d, midX, 0.28, midZ, 0, 0, 0, 1.4);
 
-    // 留足空位（约 45% 空置），不再密密麻麻抢主景
-    const order = [0, 1, 2, 4, 3, 1, 0, 5, 2, 0, 1, 4, 3, 2];
+    // 外圈立体路缘石（东西段净长 d 避免四角重叠闪烁，北侧 x ∈ [67.0, 75.0] 留出接驳入口缺口）
+    U.box(kit, M.curb, 0.42, 0.18, d, P.x0 - 0.25, 0.39, midZ);
+    U.box(kit, M.curb, 0.42, 0.18, d, P.x1 + 0.25, 0.39, midZ);
+    U.box(kit, M.curb, w + 0.92, 0.18, 0.42, midX, 0.39, P.z1 + 0.25);
+    const northLeftW = 67.0 - P.x0;
+    const northRightW = P.x1 - 75.0;
+    U.box(kit, M.curb, northLeftW + 0.46, 0.18, 0.42, P.x0 + northLeftW / 2 - 0.23, 0.39, P.z0 - 0.25);
+    U.box(kit, M.curb, northRightW + 0.46, 0.18, 0.42, 75.0 + northRightW / 2 + 0.23, 0.39, P.z0 - 0.25);
+
+    // 入口标识立牌与道口标线（置于北侧绿化带 x=65.4, z=55.6，完全避开首排车位，双面正向显示）
+    U.box(kit, M.steel, 0.28, 3.2, 0.28, 65.4, 1.80, P.z0 - 2.4);
+    U.box(kit, M.steel, 4.76, 1.18, 0.22, 65.4, 3.35, P.z0 - 2.4);
+    U.box(kit, M.line, 7.6, 0.025, 0.24, 71.0, 0.375, P.z0 + 0.4);
+    const pSignCfg = {
+      size: 62, subSize: 24, bg: 'rgba(14,24,36,0.94)', border: 'rgba(120,195,255,0.48)',
+      color: '#eef6ff', subColor: 'rgba(180,218,245,0.85)', doubleSide: false,
+    };
+    sign(world, 'P 生态停车场', 'ECO PARKING · 57 BAYS', 4.6, 1.05, 65.4, 3.35, P.z0 - 2.53, Math.PI, pSignCfg);
+    sign(world, 'P 生态停车场', 'ECO PARKING · 57 BAYS', 4.6, 1.05, 65.4, 3.35, P.z0 - 2.27, 0, pSignCfg);
+
+    // 2. 四排车位布局（每排 15 车位，东西两侧各留 6m 环形通车通道，中间设 2.4m 绿化分隔岛）
+    const xStart = P.x0 + 6.0; // 50.0
+    const nStalls = 15;        // x = 50.0 .. 95.0
+    const stallD = 5.0;
+    const rows = [
+      { z0: P.z0 + 0.8,  z1: P.z0 + 5.8,  rot: 0,       stopZ: P.z0 + 1.55,  skip: [6, 7, 8] }, // Row 0 (North, entry gap at x=68..77)
+      { z0: P.z0 + 12.0, z1: P.z0 + 17.0, rot: Math.PI, stopZ: P.z0 + 16.25, skip: [] },        // Row 1 (Center-North)
+      { z0: P.z0 + 19.4, z1: P.z0 + 24.4, rot: 0,       stopZ: P.z0 + 20.15, skip: [] },        // Row 2 (Center-South)
+      { z0: P.z0 + 30.6, z1: P.z0 + 35.6, rot: Math.PI, stopZ: P.z0 + 34.85, skip: [], evFrom: 7 }, // Row 3 (South + EV Solar Carport)
+    ];
+
+    const evGreenMat = new THREE.MeshStandardMaterial({ color: 0x3b7d54, roughness: 0.78, metalness: 0.05 });
+    const solarMat = new THREE.MeshStandardMaterial({ color: 0x1d3147, roughness: 0.24, metalness: 0.55 });
+    const order = [0, 1, 2, 4, 3, 1, 0, 5, 2, 6, 1, 4, 3, 0, 2];
+    if (!world.parkingSlots) world.parkingSlots = [];
     let k = 0;
-    for (let i = 0; i < n; i++) {
-      const x = P.x0 + st * (i + 0.5);
-      for (const half of [0, 1]) {
-        if ((i * 5 + half * 3) % 5 === 0 || (i * 2 + half * 7) % 4 === 1) { k++; continue; }
-        const z = half === 0 ? P.z0 + rowD / 2 - 0.15 : P.z1 - rowD / 2 + 0.15;
-        const rot = half === 0 ? 0 : Math.PI;
-        if (!world.parkingSlots) world.parkingSlots = [];
+
+    for (let rIdx = 0; rIdx < rows.length; rIdx++) {
+      const row = rows[rIdx];
+      const rMidZ = (row.z0 + row.z1) / 2;
+
+      // 车位分隔白线 + 混凝土限位挡车器
+      for (let i = 0; i <= nStalls; i++) {
+        const prevSkipped = i > 0 && row.skip.includes(i - 1);
+        const curSkipped = i < nStalls && row.skip.includes(i);
+        if (prevSkipped && curSkipped) continue;
+        const x = xStart + i * st;
+        U.box(kit, M.line, 0.12, 0.025, stallD - 0.3, x, 0.375, rMidZ, 0, 0, 0, 0.02);
+      }
+      // 排底贯通边线（略高于竖向车位线 4mm，避免交点闪烁）
+      if (row.skip.length === 0) {
+        U.box(kit, M.line, nStalls * st, 0.025, 0.12, xStart + (nStalls * st) / 2, 0.379, row.rot === 0 ? row.z0 + 0.12 : row.z1 - 0.12);
+      } else {
+        U.box(kit, M.line, 6 * st, 0.025, 0.12, xStart + 3 * st, 0.379, row.z0 + 0.12);
+        U.box(kit, M.line, 6 * st, 0.025, 0.12, xStart + 12 * st, 0.379, row.z0 + 0.12);
+      }
+
+      for (let i = 0; i < nStalls; i++) {
+        if (row.skip.includes(i)) continue;
+        const cx = xStart + (i + 0.5) * st;
+        // 混凝土限位块
+        U.box(kit, M.concreteTrough, 1.85, 0.14, 0.22, cx, 0.41, row.stopZ);
+        // 新能源车位绿色地坪标识 + 充电桩
+        if (row.evFrom != null && i >= row.evFrom) {
+          U.box(kit, evGreenMat, st - 0.32, 0.02, stallD - 0.5, cx, 0.365, rMidZ);
+          if (i % 2 === 1) {
+            U.box(kit, M.steelLight, 0.32, 1.38, 0.24, cx + st * 0.5, 1.03, row.z1 + 0.15);
+            U.box(kit, evGreenMat, 0.22, 0.42, 0.26, cx + st * 0.5, 1.37, row.z1 + 0.15);
+          }
+        }
+
+        // 约 60% 车位自然停放车辆，保留 40% 呼吸空位
+        const hash = (rIdx * 13 + i * 7) % 10;
+        if (hash === 1 || hash === 4 || hash === 7 || hash === 9) { k++; continue; }
         world.parkingSlots.push({
-          x: x,
-          y: 0.35,
-          z: z,
-          rot: rot,
+          x: cx,
+          y: 0.345,
+          z: rMidZ + (row.rot === 0 ? -0.10 : 0.10),
+          rot: row.rot,
           kind: FL.CAR_MODELS[order[k % order.length] % FL.CAR_MODELS.length],
         });
         k++;
       }
     }
 
-    // 停车场东西两侧绿化隔离带
-    for (const gx of [P.x0 - 2.6, P.x1 + 2.6]) {
-      U.box(kit, M.concreteTrough, 2.2, 0.42, P.z1 - P.z0, gx, 0.42, midZ, 0, 0, 0, 0.4);
-      U.box(kit, M.leafA, 1.6, 0.72, P.z1 - P.z0 - 1.2, gx, 0.88, midZ, 0, 0, 0, 0.3);
+    // 3. 南排东半段现代化光伏充电车棚（覆盖 8 个新能源车位 x = 71..95）
+    const cpX0 = xStart + 7 * st; // 71.0
+    const cpX1 = xStart + 15 * st; // 95.0
+    const cpW = cpX1 - cpX0;
+    const cpCx = (cpX0 + cpX1) / 2;
+    const cpCz = P.z0 + 33.1;
+    // 钢结构悬挑立柱（4 根后柱 + 斜撑悬挑梁）
+    for (let c = 0; c <= 4; c++) {
+      const px = cpX0 + 0.8 + c * ((cpW - 1.6) / 4);
+      U.box(kit, M.steel, 0.22, 2.95, 0.26, px, 1.82, P.z0 + 35.45);
+      U.box(kit, M.steel, 0.16, 0.22, 5.2, px, 3.35, cpCz, 0.11, 0, 0);
     }
-    for (const lx of [P.x0 + 10, P.x1 - 10]) {
-      U.cyl(kit, M.steel, 0.08, 0.1, 4.8, 8, lx, 2.6, P.z1 - 0.8);
-      U.box(kit, M.lamp, 0.7, 0.15, 0.48, lx, 4.95, P.z1 - 0.8);
-      glowSprite(world, 0xffd7a0, 2.0, lx, 4.95, P.z1 - 0.8, 0.75);
-      world.pools.push({ x: lx, z: midZ, size: 12, warm: 0.7 });
+    U.box(kit, M.steel, cpW + 0.6, 0.18, 0.20, cpCx, 3.12, P.z0 + 35.45);
+    U.box(kit, M.steel, cpW + 0.6, 0.16, 0.18, cpCx, 3.60, P.z0 + 30.85);
+    // 光伏电池板阵列（8 组倾斜蓝黑光伏板 + 铝框，拉开 4cm 高度差避免重叠闪烁）
+    for (let p = 0; p < 8; p++) {
+      const sx = cpX0 + (p + 0.5) * (cpW / 8);
+      U.box(kit, M.steelLight, cpW / 8 - 0.14, 0.08, 5.35, sx, 3.44, cpCz, 0.11, 0, 0);
+      U.box(kit, solarMat, cpW / 8 - 0.28, 0.06, 5.12, sx, 3.51, cpCz, 0.11, 0, 0);
     }
+    U.box(kit, M.warmGlow, cpW - 1.2, 0.06, 0.09, cpCx, 3.22, cpCz + 0.4);
+
+    // 4. 中央 2.4m 生态绿化分隔岛 + 3 盏双臂 LED 停车场路灯
+    const islandZ = P.z0 + 18.2; // 76.2
+    const islandW = nStalls * st + 1.0;
+    U.box(kit, M.concreteTrough, islandW, 0.34, 2.1, xStart + (nStalls * st) / 2, 0.46, islandZ, 0, 0, 0, 0.5);
+    U.box(kit, M.grass, islandW - 0.6, 0.12, 1.55, xStart + (nStalls * st) / 2, 0.65, islandZ, 0, 0, 0, 0.3);
+    for (let s = 0; s < 10; s++) {
+      const sx = xStart + 2.2 + s * 4.5;
+      U.box(kit, s % 2 ? M.leafA : M.leafB, 1.5, 0.72, 1.15, sx, 0.96, islandZ, 0, s * 0.6, 0, 0.3);
+    }
+    for (const lx of [xStart + 7.5, xStart + 22.5, xStart + 37.5]) {
+      U.cyl(kit, M.steel, 0.09, 0.12, 5.6, 8, lx, 3.2, islandZ);
+      U.box(kit, M.steel, 0.14, 0.12, 2.2, lx, 5.95, islandZ);
+      for (const dz of [-0.95, 0.95]) {
+        U.box(kit, M.lamp, 0.58, 0.12, 0.42, lx, 5.88, islandZ + dz);
+        glowSprite(world, 0xffd7a0, 2.2, lx, 5.88, islandZ + dz, 0.75);
+      }
+      world.pools.push({ x: lx, z: islandZ - 6.0, size: 15, warm: 0.75 });
+      world.pools.push({ x: lx, z: islandZ + 6.0, size: 15, warm: 0.75 });
+    }
+
+    // 5. 停车场东西南三侧生态绿化隔离带
+    for (const gx of [P.x0 - 2.0, P.x1 + 2.0]) {
+      U.box(kit, M.concreteTrough, 1.9, 0.42, d, gx, 0.25, midZ, 0, 0, 0, 0.4);
+      U.box(kit, M.leafA, 1.35, 0.76, d - 1.6, gx, 0.78, midZ, 0, 0, 0, 0.3);
+    }
+    U.box(kit, M.concreteTrough, w + 1.2, 0.42, 1.9, midX, 0.25, P.z1 + 2.0, 0, 0, 0, 0.4);
+    U.box(kit, M.leafB, w - 1.2, 0.74, 1.3, midX, 0.78, P.z1 + 2.0, 0, 0, 0, 0.3);
+  }
+
+  /* 静态停放的外销成形草料车（草料交易库装卸区 · 货厢实装成形方/圆草捆） */
+  function parkedForageTruck(world, x, z, rot, opts) {
+    const o = opts || {};
+    loadBuildingGLB('models/forage_truck.glb', world, function (root) {
+      root.position.set(x, 0.24, z);
+      root.rotation.y = rot + Math.PI / 2;
+      tuneGlbRoot(root, world);
+      // 隐藏散装碎草原料，改为在货厢内装载成形待售草捆
+      const cargo = root.getObjectByName('Cargo_Forage');
+      if (cargo) cargo.visible = false;
+
+      root.traverse(function (node) {
+        if (!node.isMesh || !node.material) return;
+        const mn = node.material.name || '';
+        if (/^TruckPaint/i.test(mn) && o.paint) node.material.color.setHex(o.paint);
+        else if (/^TruckAccent/i.test(mn) && o.accent) node.material.color.setHex(o.accent);
+      });
+
+      // 在车厢局部坐标内码放两层成形草捆（z ∈ [-5.3, 1.3], y 底板 ≈ 1.45）
+      const baleMat = new THREE.MeshStandardMaterial({ color: 0xc9a348, roughness: 0.92, metalness: 0.0 });
+      const strapMat = new THREE.MeshStandardMaterial({ color: 0x3b352c, roughness: 0.8 });
+      const baleGroup = new THREE.Group();
+      if (o.baleShape === 'round') {
+        const rg = new THREE.CylinderGeometry(0.68, 0.68, 1.55, 14);
+        rg.rotateZ(Math.PI / 2);
+        for (const bz of [-4.2, -2.5, -0.8, 0.8]) {
+          for (const [bx, by] of [[-0.48, 2.05], [0.48, 2.05], [0, 3.05]]) {
+            const m = new THREE.Mesh(rg, baleMat);
+            m.position.set(bx, by, bz);
+            m.castShadow = true;
+            m.receiveShadow = true;
+            baleGroup.add(m);
+          }
+        }
+      } else {
+        const bg = new THREE.BoxGeometry(1.06, 0.82, 1.62);
+        for (const bz of [-4.3, -2.55, -0.8, 0.85]) {
+          for (const bx of [-0.56, 0.56]) {
+            for (const by of [1.88, 2.72]) {
+              const m = new THREE.Mesh(bg, baleMat);
+              m.position.set(bx, by, bz);
+              m.castShadow = true;
+              m.receiveShadow = true;
+              baleGroup.add(m);
+            }
+          }
+        }
+        // 捆扎带
+        const sg = new THREE.BoxGeometry(2.26, 0.06, 0.08);
+        for (const bz of [-4.3, -2.55, -0.8, 0.85]) {
+          const s = new THREE.Mesh(sg, strapMat);
+          s.position.set(0, 3.16, bz);
+          baleGroup.add(s);
+        }
+      }
+      root.add(baleGroup);
+      world.group.add(root);
+    });
+    ao(world, 13.2, 3.6, x, z, 0.32, rot);
+  }
+
+  /* ---------------- 豪华草料交易库（Blender 精模 forage_yard.glb + 装卸坪 + 外销拉草车） ---------------- */
+  function buildForageYard(kit, M, world) {
+    const F = L.market.forageYard;
+    if (!F) return;
+    const cx = F.cx, cz = F.cz;
+    const scx = F.shedCx, scz = F.shedCz, sw = F.shedW, sd = F.shedD;
+    const halfD = sd / 2;
+
+    // 1. 硬化场坪与装卸作业前场（含明确的车位标线与南侧外销通行道）
+    U.box(kit, M.apronEdge, F.w + 1.6, 0.10, F.d + 1.6, cx, 0.20, cz, 0, 0, 0, 1.8);
+    U.box(kit, M.yard, F.w, 0.12, F.d, cx, 0.22, cz, 0, 0, 0, 2.4);
+
+    // 装卸月台引导线与三个清晰分区的拉草车装卸车位（z ∈ [25.2, 33.2]，为南侧 z=35.6 通行车留足净空）
+    U.box(kit, M.yellow, sw - 2, 0.025, 0.18, scx, 0.29, scz + halfD + 4.2);   // z = 25.2
+    U.box(kit, M.yellow, sw - 2, 0.025, 0.18, scx, 0.29, scz + halfD + 12.2);  // z = 33.2
+    for (const dx of [-15.5, -1.5, 15.5]) {
+      U.box(kit, M.yellow, 0.16, 0.025, 8.0, scx + dx, 0.29, scz + halfD + 8.2);
+    }
+
+    // 2. 加载 Blender 精细化大跨度钢结构草料交易库（含工字钢桁架、采光天窗、质检室、抱草叉车与分级草捆）
+    loadBuildingGLB('models/forage_yard.glb', world, function (root) {
+      root.position.set(scx, 0, scz);
+      tuneGlbRoot(root, world);
+      root.traverse(function (o) {
+        if (!o.isMesh || !o.material) return;
+        const mn = o.material.name || '';
+        if (/ClearGlass/i.test(mn)) {
+          o.material.transparent = true;
+          o.material.opacity = 0.34;
+          o.material.depthWrite = false;
+          o.material.envMapIntensity = 1.45;
+          o.castShadow = false;
+        }
+      });
+      world.group.add(root);
+    });
+
+    // 南侧挑檐上方实体灯箱正向标牌（严丝合缝嵌于 Blender SignFrameDark 灯箱正面 z = scz + 15.72，零穿插遮挡！）
+    sign(world, '草料交易库', 'FORAGE TRADING & STORAGE CENTER', 14.6, 1.88, scx, 8.02, scz + 15.72, 0, {
+      size: 86, subSize: 28, bg: 'rgba(16,24,18,0.95)', border: 'rgba(157,224,122,0.58)',
+      color: '#f4f9f1', subColor: 'rgba(195,232,175,0.88)', doubleSide: false,
+    });
+
+    // 3. 棚前装卸坪停放 3 台满载成形草捆的外销拉草车（位置与标线精准对齐，绝不挡住 z=35.6 通行车）
+    parkedForageTruck(world, scx - 10.5, scz + halfD + 6.2, Math.PI, { baleShape: 'square', paint: 0x2f6344, accent: 0xd9a84e });
+    parkedForageTruck(world, scx + 6.8, scz + halfD + 6.2, 0, { baleShape: 'round', paint: 0x325a7a, accent: 0xd9a84e });
+    parkedForageTruck(world, scx + 8.5, scz + halfD + 10.2, 0, { baleShape: 'square', paint: 0xa04132, accent: 0xd9a84e });
+
+    // 4. 场院四角高杆照明灯柱与夜间暖光池
+    for (const lx of [cx - F.w / 2 + 2.4, cx + F.w / 2 - 2.4]) {
+      for (const lz of [cz + F.d / 2 - 1.8, cz - 2.5]) {
+        U.cyl(kit, M.steel, 0.08, 0.1, 5.8, 8, lx, 3.1, lz);
+        U.box(kit, M.lamp, 0.78, 0.16, 0.50, lx, 6.0, lz);
+        glowSprite(world, 0xffd7a0, 2.3, lx, 6.0, lz, 0.8);
+      }
+      world.pools.push({ x: lx, z: cz + 6, size: 18, warm: 0.85 });
+    }
+    world.pools.push({ x: scx, z: scz, size: 30, warm: 0.85 });
+    world.pools.push({ x: scx, z: scz + halfD + 4.5, size: 24, warm: 0.90 });
   }
 
   /* ---------------- 入口 ---------------- */
@@ -804,6 +1098,7 @@ import { FL } from './fl.js';
     buildCompoundWall(kit, M, world);
     buildTradingCenter(kit, M, world);
     buildStaffOffice(kit, M, world);
+    buildForageYard(kit, M, world);
     buildParking(kit, M, world);
 
     buildAO(world);

@@ -34,16 +34,17 @@ import { FL } from './fl.js';
   /* ---------------- 地形高度场（园区平整，外围缓坡 + 远山） ---------------- */
   function terrainHeight(wx, wz) {
     // 园区及外圈缓冲带保持完全平整，避免地面穿帮
-    const dx = Math.max(0, Math.abs(wx) - 168);
-    const dz = Math.max(0, Math.abs(wz) - 138);
+    const dx = Math.max(0, Math.abs(wx) - 188);
+    const dz = Math.max(0, Math.abs(wz) - 162);
     const dPad = Math.hypot(dx, dz);
     if (dPad <= 0) return Y_NEAR;
 
-    // 进场/出场道路走廊压平（东北原开口已封闭）
-    const nearWestRoad = wx < -120 && Math.abs(wz - (56 + (-wx - 127) * 0.13)) < 38;
-    const nearEastRoad = wz > 90 && Math.abs(wx - (112 + (wz - 96) * 0.08)) < 34;
+    // 进场/出场外部主干道与接驳支路走廊压平
+    const nearSouthMain = Math.abs(wz - 138) < 28;
+    const nearWestSpur = wx < -130 && wx > -186 && wz > 42 && wz < 150;
+    const nearEastSpur = Math.abs(wx - 112) < 26 && wz > 100 && wz < 150;
     let mask = U.smoothstep(0, 180, dPad);
-    if (nearWestRoad || nearEastRoad) mask *= 0.15;
+    if (nearSouthMain || nearWestSpur || nearEastSpur) mask *= 0.12;
 
     // 柔和低频起伏（草原缓丘）
     const h1 = Math.sin(wx * 0.0042 + 0.7) * Math.cos(wz * 0.0038 - 0.4) * 5.8;
@@ -257,37 +258,57 @@ import { FL } from './fl.js';
     };
   }
 
-  /* ---------------- 场外延伸道路 ---------------- */
+  /* ---------------- 场外延伸道路（远景延续段，与近场 3D 沥青路色调对齐） ---------------- */
   function paintRoads(ctx, S, span) {
     const P = worldToPx(span, S);
-    const a = P(-127, 56), b = P(-420, 62), c = P(-760, 120), d = P(-1300, 210);
-    ctx.strokeStyle = '#4e4b45';
-    ctx.lineCap = 'round';
-    ctx.lineWidth = Math.max(2.4, (S / span) * 12);
-    ctx.beginPath();
-    ctx.moveTo(a[0], a[1]);
-    ctx.quadraticCurveTo(b[0], b[1], c[0], c[1]);
-    ctx.quadraticCurveTo(P(-1000, 150)[0], P(-1000, 150)[1], d[0], d[1]);
-    ctx.stroke();
-    ctx.strokeStyle = 'rgba(198,186,148,0.28)';
-    ctx.lineWidth = Math.max(0.8, (S / span) * 0.9);
-    ctx.stroke();
+    const pxW = (m) => Math.max(2.0, (S / span) * m);
 
-    const n0 = P(112, 95), n1 = P(115, 200), n2 = P(128, 420), n3 = P(168, 760);
-    ctx.strokeStyle = '#4e4b45';
-    ctx.lineWidth = Math.max(2.4, (S / span) * 11);
-    ctx.beginPath();
-    ctx.moveTo(n0[0], n0[1]);
-    ctx.bezierCurveTo(n1[0], n1[1], n2[0], n2[1], n3[0], n3[1]);
-    ctx.stroke();
-    ctx.strokeStyle = 'rgba(198,186,148,0.26)';
-    ctx.lineWidth = Math.max(0.8, (S / span) * 0.9);
-    ctx.stroke();
+    const drawRoad = (drawPath, widthM) => {
+      ctx.strokeStyle = '#3d4044';
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = pxW(widthM + 2.0);
+      ctx.beginPath();
+      drawPath();
+      ctx.stroke();
 
-    const S1 = P(-1400, 620), S2 = P(1400, 560);
-    ctx.strokeStyle = '#4a4741';
-    ctx.lineWidth = Math.max(2.4, (S / span) * 10);
-    ctx.beginPath(); ctx.moveTo(S1[0], S1[1]); ctx.lineTo(S2[0], S2[1]); ctx.stroke();
+      ctx.strokeStyle = '#26292c';
+      ctx.lineWidth = pxW(widthM);
+      ctx.beginPath();
+      drawPath();
+      ctx.stroke();
+
+      ctx.save();
+      ctx.strokeStyle = 'rgba(199,155,63,0.72)';
+      ctx.lineWidth = Math.max(0.9, (S / span) * 0.55);
+      ctx.beginPath();
+      drawPath();
+      ctx.stroke();
+      ctx.restore();
+    };
+
+    // 南侧东西向外部主干道（z = 138）
+    drawRoad(() => {
+      const l = P(-1350, 138), r = P(1350, 138);
+      ctx.moveTo(l[0], l[1]);
+      ctx.lineTo(r[0], r[1]);
+    }, 13.0);
+
+    // 西门接驳支路（x = -160）
+    drawRoad(() => {
+      const p0 = P(-137, 56), p1 = P(-152, 56), p2 = P(-160, 56), p3 = P(-160, 64), p4 = P(-160, 138);
+      ctx.moveTo(p0[0], p0[1]);
+      ctx.lineTo(p1[0], p1[1]);
+      ctx.quadraticCurveTo(p2[0], p2[1], p3[0], p3[1]);
+      ctx.lineTo(p4[0], p4[1]);
+    }, 11.2);
+
+    // 东南门接驳支路（x = 112）
+    drawRoad(() => {
+      const p0 = P(112, 108), p1 = P(112, 138);
+      ctx.moveTo(p0[0], p0[1]);
+      ctx.lineTo(p1[0], p1[1]);
+    }, 11.0);
   }
 
   /* ---------------- 集群式自然林带点位 ---------------- */
@@ -324,10 +345,11 @@ import { FL } from './fl.js';
         const r = Math.pow(rand(), 0.65);
         const x = g.cx + Math.cos(a) * g.rx * r;
         const z = g.cz + Math.sin(a) * g.rz * r;
-        // 确保不侵占园区本体与道路
-        if (Math.abs(x) < 131 && Math.abs(z) < 103) continue;
-        if (x < -124 && Math.abs(z - 56) < 16) continue;
-        if (z > 88 && Math.abs(x - 112) < 16) continue;
+        // 确保不侵占扩大后的园区本体与外部主干道/支路
+        if (x > -142 && x < 142 && z > -108 && z < 112) continue;
+        if (Math.abs(z - 138) < 15) continue;
+        if (x < -134 && x > -176 && z > 44 && z < 146) continue;
+        if (z > 100 && z < 146 && Math.abs(x - 112) < 15) continue;
 
         const kind = g.kind === 'mix' ? (rand() > 0.45 ? 'broad' : 'poplar') : g.kind;
         const near = Math.hypot(x, z) < 235;

@@ -73,8 +73,9 @@ import { FL } from './fl.js';
       prev.copy(p);
       const a = offset - width / 2;
       const b = offset + width / 2;
-      pos.push(p.x + nx * a, y, p.z + nz * a);
-      pos.push(p.x + nx * b, y, p.z + nz * b);
+      const yy = opts.y1 != null ? y + (opts.y1 - y) * u : y;
+      pos.push(p.x + nx * a, yy, p.z + nz * a);
+      pos.push(p.x + nx * b, yy, p.z + nz * b);
       uv.push(dist / uvTile, 0, dist / uvTile, width / uvTile);
       if (i < n) {
         const k = i * 2;
@@ -380,7 +381,7 @@ import { FL } from './fl.js';
     U.box(kit, M.soil, L.slab.w, 9, L.slab.d, 0, -4.6, cz, 0, 0, 0, 5);
     U.box(kit, M.plinth, L.slab.w + 5, 1.6, L.slab.d + 5, 0, -9.6, cz, 0, 0, 0, 6);
     // 草皮
-    flatRound(kit, M.lawn, 252, 192, 0, cz, 0.04, 6, 0);
+    flatRound(kit, M.lawn, 272, 210, 0, cz, 0.04, 6, 0);
     // 场地
     flatRound(kit, M.apronEdge, 232, 168, 0, -4, 0.16, 13, 12);
     flatRound(kit, M.apron, 228, 164, 0, -4, 0.2, 12, 12);
@@ -444,7 +445,7 @@ import { FL } from './fl.js';
       [103.5, 48, 0.36, 8.8],
       [112, 39.8, 9.6, 0.36],
       [112, 56.2, 9.6, 0.36],
-      [112, 83.2, 10.0, 0.36],
+      [112, 97.2, 10.0, 0.36],
     ];
     for (const s of stopBars) {
       U.box(kit, M.line, s[2], 0.022, s[3], s[0], 0.242, s[1]);
@@ -466,7 +467,7 @@ import { FL } from './fl.js';
       }
     }
     crosswalk(12, 48, 2.8, 8.6, true);      // 办公楼北广场过街斑马线
-    crosswalk(-20, 40.0, 6.8, 2.8, false);  // 交易大厅接驳口横向斑马线
+    crosswalk(-25, 40.0, 7.2, 2.8, false);  // 交易大厅接驳口横向斑马线
     crosswalk(-58, 12, 8.8, 2.8, false);    // 交易区-配料区横道线
 
     // 地面导向箭头
@@ -499,6 +500,37 @@ import { FL } from './fl.js';
     const wb = L.slots.weighbridge;
     for (let i = 0; i < 6; i++) {
       U.box(kit, M.yellow, 2.4, 0.022, 0.28, wb.x - 13.8, 0.242, wb.z - 4.5 + i * 1.8, 0, 0, 0);
+    }
+
+    // 园外近中景 3D 沥青主干道与接驳支路（与园内路面同材质同色调）
+    const extSegments = [
+      // 西门门口斜坡衔接段（y: 0.225 -> -0.40）
+      { pts: [[-137, 56], [-145, 56]], w: 11.5, y: 0.225, y1: -0.40 },
+      // 西门外接驳支路（沿 x = -160 向南汇入外部主干道）
+      { pts: [[-145, 56], [-153, 56], [-158.5, 58.5], [-160, 64], [-160, 138]], w: 11.2, y: -0.40 },
+      // 东南门门口斜坡衔接段（y: 0.225 -> -0.40）
+      { pts: [[112, 107.5], [112, 115.5]], w: 11.0, y: 0.225, y1: -0.40 },
+      // 东南门外接驳支路（沿 x = 112 向南汇入外部主干道）
+      { pts: [[112, 115.5], [112, 138]], w: 11.0, y: -0.40 },
+      // 南侧东西向外部主干道（z = 138，不穿过园区）
+      { pts: [[-380, 138], [-160, 138], [112, 138], [380, 138]], w: 13.0, y: -0.40 },
+    ];
+    for (const seg of extSegments) {
+      const curbY = seg.y1 != null ? seg.y - 0.09 : seg.y - 0.04;
+      const curbY1 = seg.y1 != null ? seg.y1 - 0.04 : undefined;
+      kit.add(ribbonGeo(seg.pts, seg.w + 1.5, curbY, { uv: 10, y1: curbY1, tension: 0.2 }), M.curb);
+      kit.add(ribbonGeo(seg.pts, seg.w, seg.y, { uv: 12, y1: seg.y1, tension: 0.2 }), M.asphalt);
+      const eo = seg.w / 2 - 0.50;
+      const lineY = seg.y + 0.015;
+      const lineY1 = seg.y1 != null ? seg.y1 + 0.015 : undefined;
+      kit.add(ribbonGeo(seg.pts, 0.16, lineY, { offset: eo, y1: lineY1, tension: 0.2 }), M.line);
+      kit.add(ribbonGeo(seg.pts, 0.16, lineY, { offset: -eo, y1: lineY1, tension: 0.2 }), M.line);
+      kit.add(ribbonGeo(seg.pts, 0.13, lineY + 0.002, { offset: 0.14, y1: lineY1 != null ? lineY1 + 0.002 : undefined, tension: 0.2 }), M.yellow);
+      kit.add(ribbonGeo(seg.pts, 0.13, lineY + 0.002, { offset: -0.14, y1: lineY1 != null ? lineY1 + 0.002 : undefined, tension: 0.2 }), M.yellow);
+    }
+    // 外部主干道 T 字路口衔接方片（压平路口接缝）
+    for (const [jx, jz, jw, jd] of [[-160, 138, 11.2, 13.0], [112, 138, 11.0, 13.0]]) {
+      flatRound(kit, M.asphalt, jw, jd, jx, jz, -0.398, 0.2, 12);
     }
   }
 
@@ -641,21 +673,21 @@ import { FL } from './fl.js';
   }
 
   function buildFences(kit, M) {
-    // 园区最外圈全封闭现代实体围墙（仅保留西进场大门与东南出园大门两个出入口，东北原路口完全封闭！）
+    // 园区最外圈全封闭现代实体围墙（扩大周界至 x = ±134, z = -98..104）
     // 西墙（分北段与南段，并向内折接西大门门柱 x = -117）
-    perimeterWallSeg(kit, M, -124, -92, -124, 48.5);
-    perimeterWallSeg(kit, M, -124, 48.5, -117, 48.5);
-    perimeterWallSeg(kit, M, -117, 63.5, -124, 63.5);
-    perimeterWallSeg(kit, M, -124, 63.5, -124, 90);
-    // 北墙（从西北角直通东北角全程封严，彻底封死原东北敞口！）
-    perimeterWallSeg(kit, M, -124, -92, 124, -92);
+    perimeterWallSeg(kit, M, -134, -98, -134, 48.5);
+    perimeterWallSeg(kit, M, -134, 48.5, -117, 48.5);
+    perimeterWallSeg(kit, M, -117, 63.5, -134, 63.5);
+    perimeterWallSeg(kit, M, -134, 63.5, -134, 104);
+    // 北墙（从西北角直通东北角全程封严）
+    perimeterWallSeg(kit, M, -134, -98, 134, -98);
     // 东墙（从东北角直通东南角，无缝接东南出园大门东翼墙）
-    perimeterWallSeg(kit, M, 124, -92, 124, 90);
+    perimeterWallSeg(kit, M, 134, -98, 134, 104);
     // 南墙（从西南角直达东南出园大门西翼墙 x = 102.0）
-    perimeterWallSeg(kit, M, -124, 90, 102.0, 90);
+    perimeterWallSeg(kit, M, -134, 104, 102.0, 104);
 
     // 四角标志性加重角柱（强化园区轮廓边界感）
-    for (const [cx, cz] of [[-124, -92], [124, -92], [124, 90], [-124, 90]]) {
+    for (const [cx, cz] of [[-134, -98], [134, -98], [134, 104], [-134, 104]]) {
       U.box(kit, M.wallDark,       1.05, 3.55, 1.05, cx, 1.80, cz);
       U.box(kit, M.concreteTrough, 1.24, 0.22, 1.24, cx, 3.64, cz);
       U.box(kit, M.warmGlow,       0.42, 0.24, 0.42, cx, 3.86, cz);
@@ -716,18 +748,16 @@ import { FL } from './fl.js';
   function buildProps(kit, M, world) {
     const rand = U.rng(20240);
 
-    // 灯杆（避开西大门消毒通道、地磅棚与路口边界）
+    // 灯杆（避开西大门消毒通道、地磅棚、草料库前场与扩大后停车场内部）
     const poles = [
       [-104, 42, 9.2, -Math.PI / 2, true],
       [-64, 63, 8.8, Math.PI, false],
       [108, 18, 9.2, -Math.PI / 2, true],
-      [56, 62, 8.8, Math.PI, false],
+      [56, 55.2, 8.8, Math.PI, false],
       [4, -88, 9.0, 0, false],
       [-116, 20, 8.8, 0, false],
       [-4, 30, 8.8, Math.PI / 2, false],
-      [78, 30, 8.8, Math.PI, false],
-      [-40, 22, 8.4, Math.PI / 2, false],
-      [99, 16, 8.4, -Math.PI / 2, false],
+      [-45, 31, 8.4, Math.PI / 2, false],
     ];
     for (const p of poles) lampPole(kit, M, world, p[0], p[1], p[2], p[3], p[4]);
 
@@ -863,13 +893,15 @@ import { FL } from './fl.js';
       [28, 5.2, -32, 0xffb066, 95, 34],
       [76, 5.2, -32, 0xffb066, 95, 34],
       [106, 5.0, -69, 0xffb878, 150, 36],
-      [-26, 6.2, 1, 0xffe2be, 260, 36],
-      [-14, 6.2, 1, 0xffe2be, 260, 36],
+      [-35, 6.8, 5, 0xf2f6fa, 280, 42, true],
+      [-15, 6.8, 5, 0xf2f6fa, 280, 42, true],
+      [-25, 6.6, 12, 0xfff4e6, 240, 38, true],
     ];
     world.pointLights = [];
     for (const p of pts) {
       const pl = new THREE.PointLight(p[3], p[4], p[5], 2);
       pl.position.set(p[0], p[1], p[2]);
+      if (p[6]) pl.userData.indoor = true;
       scene.add(pl);
       world.pointLights.push(pl);
     }

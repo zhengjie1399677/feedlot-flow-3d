@@ -22,7 +22,7 @@ function boot() {
   const q = new URLSearchParams(location.search);
   const fixed = q.has('t') ? Math.max(0, parseFloat(q.get('t')) || 0) : null;
   const fxOn = q.get('fx') !== '0';
-  const uiOn = q.get('ui') !== '0';
+  const uiOn = q.get('ui') === '1';
   // 昼夜：一个循环 DAY_SECONDS 秒，从 05:00 走到 23:00（夜色的两端都是深夜，循环处看不出来）
   const DAY_SECONDS = 210;
   const HOUR_FROM = 5, HOUR_TO = 23;
@@ -50,7 +50,7 @@ function boot() {
       veil.classList.remove('gone');
       veil.innerHTML =
         '<div class="box"><div class="mark"></div><h2>场景未能启动</h2>' +
-        '<p>请确认浏览器支持 WEBGL2</p></div>';
+        '<p>请确认浏览器支持 WEBGL2' + (err && err.message ? '（' + err.message + '）' : '') + '</p></div>';
     }
   }
 

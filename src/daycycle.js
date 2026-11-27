@@ -167,10 +167,11 @@ import { FL } from './fl.js';
       warm.intensity = mix3(0.24, 0.78, 0.32);
       fill.intensity = mix3(0.22, 0.42, 0.52);
 
-      /* ---- 场内灯具（白天基本关掉）---- */
+      /* ---- 场内灯具（室外白天基本关掉，交易大厅室内营业灯常亮 55% 以上）---- */
       const lampF = 0.08 + 0.92 * nightF;
+      const indoorLampF = 0.55 + 0.45 * nightF;
       for (let i = 0; i < pts.length; i++) {
-        pts[i].intensity = ptBase[i] * lampF;
+        pts[i].intensity = ptBase[i] * (pts[i].userData.indoor ? indoorLampF : lampF);
         pts[i].userData.dayBase = pts[i].intensity;
       }
       for (let i = 0; i < poolMats.length; i++) poolMats[i].opacity = poolBase[i] * (0.10 + 0.90 * nightF);
