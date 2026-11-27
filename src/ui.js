@@ -204,3 +204,61 @@ import { FL } from './fl.js';
 
     return api;
   };
+
+  /* ---------------- 第一人称漫游浮层 + 交互门提示（无论 ?ui=0/1 均生效） ---------------- */
+  FL.createWalkOverlay = function (rig) {
+    const toggleBtn = document.getElementById('walk-toggle');
+    const hud = document.getElementById('walk-hud');
+    const tabsEl = document.getElementById('walk-tabs');
+    const exitBtn = document.getElementById('walk-exit');
+    const promptBtn = document.getElementById('door-prompt');
+    const promptText = document.getElementById('door-prompt-text');
+    const tabEls = new Map();
+
+    const spots = rig.walkSpots || [];
+    if (tabsEl && spots.length) {
+      spots.forEach(function (sp, i) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.innerHTML = '<span class="k">' + (i + 1) + '</span><span></span>';
+        b.querySelector('span:last-child').textContent = sp.label;
+        b.addEventListener('click', function () { rig.setWalkSpot(sp.id); });
+        tabsEl.appendChild(b);
+        tabEls.set(sp.id, b);
+      });
+    }
+
+    if (toggleBtn) toggleBtn.addEventListener('click', function () { rig.toggleWalk(); });
+    if (exitBtn) exitBtn.addEventListener('click', function () { rig.exitWalk(); });
+    if (promptBtn) promptBtn.addEventListener('click', function () { rig.interactDoor(); });
+
+    function syncWalk(active, spotId) {
+      document.body.classList.toggle('walk', !!active);
+      if (toggleBtn) {
+        toggleBtn.classList.toggle('on', !!active);
+        const t = toggleBtn.querySelector('.txt');
+        if (t) t.textContent = active ? '退出漫游' : '第一人称';
+      }
+      if (hud) hud.classList.toggle('show', !!active);
+      for (const [id, el] of tabEls) el.classList.toggle('on', !!active && id === spotId);
+    }
+    if (rig.onWalkChange) rig.onWalkChange(syncWalk);
+
+    let lastDoorKey = '';
+    return {
+      updateDoorPrompt: function (door) {
+        if (!promptBtn || !promptText) return;
+        const key = door ? (door.id + ':' + (door.isOpen ? '1' : '0')) : '';
+        if (key === lastDoorKey) return;
+        lastDoorKey = key;
+        if (door) {
+          promptText.textContent = (door.isOpen ? '关闭 ' : '打开 ') + door.label;
+          promptBtn.classList.add('show');
+          promptBtn.setAttribute('aria-hidden', 'false');
+        } else {
+          promptBtn.classList.remove('show');
+          promptBtn.setAttribute('aria-hidden', 'true');
+        }
+      },
+    };
+  };

@@ -590,13 +590,13 @@ import { FL } from './fl.js';
       world.group.add(root);
     });
 
-    // 南侧门廊屋顶现代银灰灯箱正向标牌（严丝合缝嵌于 Blender 灯箱正面 z = cz + 18.25, y = 11.79，清爽银青配色无金色）
-    sign(world, '草畜牧交易大厅', 'FORAGE & LIVESTOCK TRADING HALL', 17.6, 2.20, cx, 11.79, cz + 18.25, 0, {
-      size: 68, subSize: 22, bg: 'rgba(14,20,27,0.95)', border: 'rgba(105,212,188,0.62)',
+    // 南侧门廊屋顶现代银灰灯箱正向标牌（严丝合缝嵌于 Blender 灯箱正面 z = cz + 18.29, y = 11.92，拉开 7cm 防闪烁）
+    sign(world, '草牧交易大厅', 'FORAGE & LIVESTOCK TRADING HALL', 17.6, 2.20, cx, 11.92, cz + 18.29, 0, {
+      size: 72, subSize: 22, bg: 'rgba(14,20,27,0.95)', border: 'rgba(105,212,188,0.62)',
       glow: 'rgba(115,220,205,0.22)', color: '#f2f7fa', subColor: 'rgba(176,222,226,0.88)', doubleSide: false,
     });
 
-    // 室内北墙 18.2m 巨幅 LED 实时大宗行情显示屏（高分辨率 Canvas，进入大厅内景清晰可读！）
+    // 室内北墙 18.2m 巨幅 LED 实时大宗行情显示屏（高分辨率 Canvas，位于 cz - 11.90，距背板 10cm 彻底杜绝闪烁！）
     (function buildIndoorMarketBoard() {
       const c = U.makeCanvas(1600, 400);
       const ctx = c.getContext('2d');
@@ -616,7 +616,7 @@ import { FL } from './fl.js';
       ctx.fillStyle = '#eef7fb';
       ctx.font = '700 38px "Microsoft YaHei","Bahnschrift",sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText('草畜牧大宗交易实时行情中心 · LIVE MARKET QUOTES', 42, 64);
+      ctx.fillText('草牧大宗交易实时行情中心 · LIVE MARKET QUOTES', 42, 64);
       ctx.fillStyle = '#6cf0b0';
       ctx.font = '600 24px "Bahnschrift","Microsoft YaHei",sans-serif';
       ctx.textAlign = 'right';
@@ -659,9 +659,74 @@ import { FL } from './fl.js';
       tex.anisotropy = 8;
       const mat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false });
       const screenMesh = new THREE.Mesh(new THREE.PlaneGeometry(18.1, 4.30), mat);
-      screenMesh.position.set(cx, 5.65, cz - 12.00);
+      screenMesh.position.set(cx, 5.65, cz - 11.90);
       screenMesh.renderOrder = 4;
       world.group.add(screenMesh);
+
+      // 左右两块 4.0×3.9m 副屏高清数据画面（位于 cz - 11.86，距背板拉开间距彻底杜绝闪烁并展示质检/叫号数据！）
+      function makeSideBoard(title, sub, rows, xOff) {
+        const sc = U.makeCanvas(512, 512);
+        const sctx = sc.getContext('2d');
+        sctx.fillStyle = '#091722';
+        sctx.fillRect(0, 0, 512, 512);
+        sctx.strokeStyle = 'rgba(108,210,192,0.62)';
+        sctx.lineWidth = 4;
+        sctx.strokeRect(10, 10, 492, 492);
+        sctx.fillStyle = 'rgba(68,176,158,0.18)';
+        sctx.fillRect(14, 14, 484, 86);
+        sctx.fillStyle = '#eef8fb';
+        sctx.font = '700 32px "Microsoft YaHei",sans-serif';
+        sctx.textAlign = 'left';
+        sctx.fillText(title, 30, 56);
+        sctx.fillStyle = '#6ef2b4';
+        sctx.font = '500 18px "Bahnschrift","Microsoft YaHei",sans-serif';
+        sctx.fillText(sub, 30, 86);
+
+        rows.forEach((r, idx) => {
+          const y = 122 + idx * 92;
+          sctx.fillStyle = 'rgba(18,38,54,0.88)';
+          sctx.fillRect(26, y, 460, 76);
+          sctx.strokeStyle = 'rgba(110,185,210,0.25)';
+          sctx.lineWidth = 2;
+          sctx.strokeRect(26, y, 460, 76);
+          sctx.fillStyle = '#d4eaf5';
+          sctx.font = '600 24px "Microsoft YaHei",sans-serif';
+          sctx.textAlign = 'left';
+          sctx.fillText(r[0], 44, y + 36);
+          sctx.fillStyle = 'rgba(170,205,222,0.75)';
+          sctx.font = '400 17px "Microsoft YaHei",sans-serif';
+          sctx.fillText(r[2], 44, y + 63);
+          sctx.fillStyle = r[3] || '#7ce4ff';
+          sctx.font = '700 28px "Bahnschrift","Microsoft YaHei",sans-serif';
+          sctx.textAlign = 'right';
+          sctx.fillText(r[1], 468, y + 48);
+        });
+
+        const stex = new THREE.CanvasTexture(sc);
+        stex.colorSpace = THREE.SRGBColorSpace;
+        stex.anisotropy = 8;
+        const smesh = new THREE.Mesh(
+          new THREE.PlaneGeometry(3.96, 3.90),
+          new THREE.MeshBasicMaterial({ map: stex, toneMapped: false })
+        );
+        smesh.position.set(cx + xOff, 5.65, cz - 11.86);
+        smesh.renderOrder = 4;
+        world.group.add(smesh);
+      }
+
+      makeSideBoard('草料品质快检', 'NIR QUALITY INSPECTION · 合格率 99.4%', [
+        ['紫花苜蓿干草', '18.6%', '粗蛋白达标 · 一级优等品', '#6ef2b4'],
+        ['燕麦干草方捆', '12.4%', '含水率检测 · 干燥优良', '#7ce4ff'],
+        ['全株玉米青贮', '34.2%', '淀粉含量 · 发酵 pH 3.9', '#6ef2b4'],
+        ['今日入库抽检', '46 批', '溯源二维码已全部上链', '#a8e6ff'],
+      ], -12.8);
+
+      makeSideBoard('结算窗口动态', 'SETTLEMENT QUEUE · 01–08 窗口', [
+        ['01–02 活牛结算', '办理中', '当前叫号 A038 · 等待 2 户', '#7ce4ff'],
+        ['03–05 草料过磅', '办理中', '当前叫号 B112 · 等待 3 户', '#6ef2b4'],
+        ['06 检疫放行证', '畅通', '平均办理耗时 3.5 分钟', '#6ef2b4'],
+        ['07–08 金融签约', '办理中', '线上合同即时电子签章', '#a8e6ff'],
+      ], 12.8);
     })();
 
     world.pools.push({ x: cx, z: cz + Hh.d / 2 + 6.8, size: 38, warm: 0.90 });
@@ -749,14 +814,15 @@ import { FL } from './fl.js';
       root.position.set(cx, 0, cz);
       root.rotation.y = rot;
       tuneGlbRoot(root, world);
-      // 保留玻璃/阳台护栏的柔和通透感，同时增强反射
+      // 保留玻璃/阳台护栏的柔和通透感，开启 DoubleSide 便于第一人称从室内向外看
       root.traverse(function (o) {
         if (!o.isMesh || !o.material) return;
         const mn = o.material.name || '';
         if (/Glass/i.test(mn)) {
           o.material.transparent = true;
-          o.material.opacity = /Balcony/i.test(mn) ? 0.36 : 0.62;
+          o.material.opacity = /Balcony/i.test(mn) ? 0.34 : 0.26;
           o.material.depthWrite = false;
+          o.material.side = THREE.DoubleSide;
           o.material.envMapIntensity = 1.45;
           o.castShadow = false;
         }
@@ -764,17 +830,17 @@ import { FL } from './fl.js';
       world.group.add(root);
     });
 
-    // 楼顶实体灯箱正反双面单向标牌（FrontSide，绝不出现背面镜像反字！）
-    const signX = cx + (flipped ? 11.5 : -11.5);
-    const signY = 10.03;
+    // 楼顶实体灯箱正反双面单向标牌（居中位于中庭屋顶灯箱 cx, y=10.15, cz ± 0.30，拉开间距零闪烁）
+    const signX = cx;
+    const signY = 10.15;
     const signCfg = {
-      size: 74, subSize: 26, bg: 'rgba(18,23,28,0.94)', border: 'rgba(180,215,235,0.34)',
-      color: '#f0f6fa', subColor: 'rgba(195,216,230,0.80)', doubleSide: false,
+      size: 72, subSize: 22, bg: 'rgba(15,21,28,0.95)', border: 'rgba(110,205,185,0.58)',
+      color: '#f2f7fa', subColor: 'rgba(182,222,226,0.86)', doubleSide: false,
     };
     // 北面（面向主干道 -z）
-    sign(world, '综合办公楼', 'COMPREHENSIVE OFFICE BUILDING', 14.8, 1.72, signX, signY, cz - 0.25, Math.PI, signCfg);
-    // 南面（面向南侧全景机位 +z）
-    sign(world, '综合办公楼', 'COMPREHENSIVE OFFICE BUILDING', 14.8, 1.72, signX, signY, cz + 0.25, 0, signCfg);
+    sign(world, '综合办公楼 · 员工宿舍', 'OFFICE & STAFF DORMITORY', 14.6, 1.72, signX, signY, cz - 0.30, Math.PI, signCfg);
+    // 南面（面向南侧广场 +z）
+    sign(world, '综合办公楼 · 员工宿舍', 'OFFICE & STAFF DORMITORY', 14.6, 1.72, signX, signY, cz + 0.30, 0, signCfg);
 
     // 主入口广场（随楼体朝向同步切换前后位置）
     U.box(kit, M.apron, 54, 0.14, 13.5, cx, 0.21, cz + frontDir * 12.6, 0, 0, 0, 0.6);

@@ -35,7 +35,7 @@
   </div>
 
   <div class="hint">
-    <span class="hint-orbit">左键拖拽<b>旋转</b> · 右键拖拽<b>平移</b> · 滚轮<b>缩放</b> · 双击<b>复位</b> · WASD <b>移动</b> · Q/E <b>升降</b></span>
+    <span class="hint-orbit">左键拖拽<b>旋转</b> · 右键拖拽<b>平移</b> · 滚轮<b>缩放</b> · 双击<b>复位</b> · WASD <b>移动</b> · Q/E <b>升降</b> · V <b>第一人称</b></span>
     <span class="hint-ride">拖拽<b>环视</b> · 滚轮<b>变焦</b> · 双击<b>归正</b> · 1–4 <b>换车</b> · C / Esc <b>退出</b></span>
   </div>
 
@@ -48,6 +48,23 @@
     </div>
     <ol class="steps" id="steps"></ol>
   </section>
+</div>
+
+<div id="walk-overlay">
+  <button id="walk-toggle" type="button" title="进入 / 退出第一人称步行漫游（快捷键 V）">
+    <span class="k">V</span><span class="txt">第一人称</span><span class="en">WALK</span>
+  </button>
+  <div id="walk-hud">
+    <div class="walk-head">
+      <span class="walk-live"><i></i>第一人称漫游<span class="en">WALKTHROUGH</span></span>
+      <span class="walk-help">WASD 步行 · Shift 加速 · 拖拽环视 · F 开关门</span>
+      <button id="walk-exit" type="button"><span class="k">V</span>退出</button>
+    </div>
+    <div id="walk-tabs"></div>
+  </div>
+  <button id="door-prompt" type="button" aria-hidden="true">
+    <span class="k">F</span><span id="door-prompt-text">打开门</span>
+  </button>
 </div>
 
 <div id="veil">

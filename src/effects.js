@@ -385,7 +385,7 @@ import { FL } from './fl.js';
   };
 
   /* ---------------- 相机 ---------------- */
-  FL.createCameraRig = function (camera, dom, fleet) {
+  FL.createCameraRig = function (camera, dom, fleet, walkSys) {
     const presets = L.cameras;
     const base = 336;
     const orbitFov = camera.fov;
@@ -546,6 +546,132 @@ import { FL } from './fl.js';
       return ride.active ? exitRide() : enterRide(null);
     }
 
+    /* ---------------- 第一人称步行漫游（带 3D 体积碰撞、爬楼梯、F 键开关门） ---------------- */
+    const walk = {
+      active: false,
+      spotId: 'office',
+      pos: new THREE.Vector3(12, 0.26, 83.2),
+      yaw: Math.PI,
+      goalYaw: Math.PI,
+      pitch: 0.04,
+      goalPitch: 0.04,
+      bob: 0,
+      nearDoor: null,
+      shift: false,
+    };
+    let onWalkChange = null;
+    const clampWalkPitch = (v) => Math.max(-1.32, Math.min(1.32, v));
+    function emitWalk() {
+      if (onWalkChange) onWalkChange(walk.active, walk.spotId);
+    }
+    function setWalkSpot(id) {
+      if (!walkSys || !walkSys.spots || !walkSys.spots.length) return false;
+      const sp = walkSys.spots.find((s) => s.id === id) || walkSys.spots[0];
+      walk.spotId = sp.id;
+      walk.pos.set(sp.x, sp.y, sp.z);
+      walk.yaw = walk.goalYaw = sp.yaw;
+      walk.pitch = walk.goalPitch = sp.pitch || 0;
+      if (!walk.active) return enterWalk(sp.id);
+      emitWalk();
+      return true;
+    }
+    function enterWalk(spotId) {
+      if (!walkSys) return false;
+      if (ride.active) exitRide();
+      if (spotId) {
+        const sp = walkSys.spots.find((s) => s.id === spotId);
+        if (sp) {
+          walk.spotId = sp.id;
+          walk.pos.set(sp.x, sp.y, sp.z);
+          walk.yaw = walk.goalYaw = sp.yaw;
+          walk.pitch = walk.goalPitch = sp.pitch || 0;
+        }
+      } else {
+        // 默认在当前镜头焦点附近落地，若不合理则落在综合办公楼门前
+        const sp = walkSys.spots.find((s) => s.id === walk.spotId) || walkSys.spots[2] || walkSys.spots[0];
+        walk.spotId = sp.id;
+        walk.pos.set(sp.x, sp.y, sp.z);
+        walk.yaw = walk.goalYaw = sp.yaw;
+        walk.pitch = walk.goalPitch = sp.pitch || 0;
+      }
+      walk.active = true;
+      walk.bob = 0;
+      keys.clear();
+      camera.fov = 62;
+      camera.near = 0.12;
+      camera.updateProjectionMatrix();
+      updateWalk(0);
+      emitWalk();
+      return true;
+    }
+    function exitWalk() {
+      if (!walk.active) return false;
+      walk.active = false;
+      walk.nearDoor = null;
+      walk.shift = false;
+      keys.clear();
+      // 退出时把轨道焦点柔和移到刚刚站立的位置附近，衔接自然
+      goal.target.set(walk.pos.x, Math.max(1.5, walk.pos.y + 1.8), walk.pos.z);
+      clampTarget(goal.target);
+      goal.dist = clampDist(Math.max(14, goal.dist));
+      goal.phi = clampPhi(Math.min(1.22, goal.phi));
+      state.target.copy(goal.target);
+      camera.fov = orbitFov;
+      camera.near = orbitNear;
+      camera.updateProjectionMatrix();
+      place();
+      emitWalk();
+      return true;
+    }
+    function toggleWalk() {
+      return walk.active ? exitWalk() : enterWalk(null);
+    }
+    function interactDoor() {
+      if (!walkSys) return false;
+      const refPos = walk.active ? walk.pos : camera.position;
+      const d = walkSys.nearestDoor(refPos, walk.active ? 3.2 : 6.0);
+      if (!d) return false;
+      d.toggle();
+      return true;
+    }
+    function updateWalk(dt) {
+      if (!walk.active || !walkSys) return;
+      const k = dt > 0 ? 1 - Math.exp(-dt * 14) : 1;
+      walk.yaw += (walk.goalYaw - walk.yaw) * k;
+      walk.pitch += (walk.goalPitch - walk.pitch) * k;
+
+      let fwd = 0, right = 0;
+      if (keys.has('u')) fwd += 1;
+      if (keys.has('d')) fwd -= 1;
+      if (keys.has('r')) right += 1;
+      if (keys.has('l')) right -= 1;
+
+      if ((fwd || right) && dt > 0) {
+        const len = Math.hypot(fwd, right) || 1;
+        fwd /= len; right /= len;
+        const speed = (walk.shift ? 8.2 : 4.2) * dt;
+        const sy = Math.sin(walk.yaw), cy = Math.cos(walk.yaw);
+        // Forward = (sin(yaw), cos(yaw)); Right = (-cos(yaw), sin(yaw))
+        const dx = (sy * fwd - cy * right) * speed;
+        const dz = (cy * fwd + sy * right) * speed;
+        walkSys.movePlayer(walk.pos, dx, dz);
+        walk.bob += dt * (walk.shift ? 12.5 : 8.5);
+      } else if (dt > 0) {
+        walk.bob = 0;
+      }
+
+      walk.nearDoor = walkSys.nearestDoor(walk.pos, 3.2);
+      const bobY = (fwd || right) ? Math.sin(walk.bob) * 0.032 : 0;
+      const eyeY = walk.pos.y + walkSys.EYE_H + bobY;
+      camera.position.set(walk.pos.x, eyeY, walk.pos.z);
+
+      const cp = Math.cos(walk.pitch);
+      const dirX = Math.sin(walk.yaw) * cp;
+      const dirY = Math.sin(walk.pitch);
+      const dirZ = Math.cos(walk.yaw) * cp;
+      camera.lookAt(walk.pos.x + dirX * 20, eyeY + dirY * 20, walk.pos.z + dirZ * 20);
+    }
+
     const MIN_CAM_Y = 1.10;
     function maxPhiFor(dist, targetY) {
       const d = Math.max(0.5, dist);
@@ -603,8 +729,8 @@ import { FL } from './fl.js';
       dom.setPointerCapture && dom.setPointerCapture(e.pointerId);
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (pointers.size === 1) {
-        // 右键 / 中键 / Shift + 拖拽 = 平移，否则旋转；跟车时一律环视
-        panning = !ride.active && (e.button === 2 || e.button === 1 || e.shiftKey || e.altKey);
+        // 右键 / 中键 / Shift + 拖拽 = 平移，否则旋转；跟车或第一人称步行时一律拖拽环视
+        panning = !ride.active && !walk.active && (e.button === 2 || e.button === 1 || e.shiftKey || e.altKey);
         dragging = !panning;
         lastX = e.clientX;
         lastY = e.clientY;
@@ -650,6 +776,12 @@ import { FL } from './fl.js';
         lastInteract = performance.now();
         return;
       }
+      if (walk.active) {
+        walk.goalYaw -= dx * 0.0036;
+        walk.goalPitch = clampWalkPitch(walk.goalPitch - dy * 0.0030);
+        lastInteract = performance.now();
+        return;
+      }
       if (panning) { panScreen(dx, dy); return; }
       vTheta = -dx * 0.0034;
       vPhi = -dy * 0.0028;
@@ -672,6 +804,9 @@ import { FL } from './fl.js';
       e.preventDefault();
       if (ride.active) {
         ride.goalFov = clampFov(ride.goalFov + e.deltaY * 0.02);
+      } else if (walk.active) {
+        camera.fov = Math.max(46, Math.min(78, camera.fov + e.deltaY * 0.015));
+        camera.updateProjectionMatrix();
       } else {
         goal.dist = clampDist(goal.dist * Math.pow(1.0016, e.deltaY));
         goal.phi = clampPhi(goal.phi);
@@ -699,6 +834,7 @@ import { FL } from './fl.js';
       state: state,
       goPreset: function (id, instant) {
         if (ride.active) exitRide();
+        if (walk.active) exitWalk();
         const p = presets.find((x) => x.id === id) || presets[0];
         currentPreset = p.id;
         goal.theta = p.theta;
@@ -724,6 +860,10 @@ import { FL } from './fl.js';
       update: function (dt) {
         if (ride.active) {
           updateRide(dt);
+          return;
+        }
+        if (walk.active) {
+          updateWalk(dt);
           return;
         }
         if (keys.size) {
@@ -759,8 +899,23 @@ import { FL } from './fl.js';
         place();
       },
       get zoom() { return base / state.dist; },
-      get dist() { return ride.active ? 18 : state.dist; },
+      get dist() { return ride.active ? 18 : (walk.active ? 8 : state.dist); },
       get currentPreset() { return currentPreset; },
+      /* 第一人称步行漫游 */
+      enterWalk: enterWalk,
+      exitWalk: exitWalk,
+      toggleWalk: toggleWalk,
+      setWalkSpot: setWalkSpot,
+      interactDoor: interactDoor,
+      onWalkChange: function (fn) {
+        onWalkChange = fn;
+        if (fn) fn(walk.active, walk.spotId);
+      },
+      get isWalking() { return walk.active; },
+      get walkSpotId() { return walk.spotId; },
+      get walkPos() { return walk.active ? walk.pos : null; },
+      get nearDoor() { return walk.active ? walk.nearDoor : (walkSys ? walkSys.nearestDoor(camera.position, 5.2) : null); },
+      get walkSpots() { return walkSys && walkSys.spots ? walkSys.spots : []; },
       /* 第一人称跟车 */
       enterRide: enterRide,
       exitRide: exitRide,
@@ -781,6 +936,26 @@ import { FL } from './fl.js';
     window.addEventListener('keydown', (e) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const k = e.key.toLowerCase();
+      if (k === 'shift') walk.shift = true;
+      if (k === 'f' && walkSys) {
+        if (interactDoor()) { e.preventDefault(); return; }
+      }
+      if (k === 'v' && walkSys) {
+        toggleWalk();
+        e.preventDefault();
+        return;
+      }
+      if (walk.active) {
+        if (k === 'escape') { exitWalk(); e.preventDefault(); return; }
+        if (PAN_KEYS[k]) { keys.add(PAN_KEYS[k]); e.preventDefault(); return; }
+        const wn = parseInt(e.key, 10);
+        if (walkSys && wn >= 1 && wn <= walkSys.spots.length) {
+          setWalkSpot(walkSys.spots[wn - 1].id);
+          e.preventDefault();
+          return;
+        }
+        return;
+      }
       if (ride.active) {
         if (k === 'c' || k === 'escape') { exitRide(); e.preventDefault(); return; }
         const rn = parseInt(e.key, 10);
@@ -806,10 +981,12 @@ import { FL } from './fl.js';
       if (n >= 1 && n <= presets.length) rig.goPreset(presets[n - 1].id);
     });
     window.addEventListener('keyup', (e) => {
-      const k = PAN_KEYS[e.key.toLowerCase()];
-      if (k) keys.delete(k);
+      const k = e.key.toLowerCase();
+      if (k === 'shift') walk.shift = false;
+      const pk = PAN_KEYS[k];
+      if (pk) keys.delete(pk);
     });
-    window.addEventListener('blur', () => keys.clear());
+    window.addEventListener('blur', () => { keys.clear(); walk.shift = false; });
     return rig;
   };
 

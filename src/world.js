@@ -896,6 +896,11 @@ import { FL } from './fl.js';
       [-35, 6.8, 5, 0xf2f6fa, 280, 42, true],
       [-15, 6.8, 5, 0xf2f6fa, 280, 42, true],
       [-25, 6.6, 12, 0xfff4e6, 240, 38, true],
+      // 综合办公楼 + 员工宿舍室内常亮照明（中庭、西侧办公区、东侧宿舍区 1F/2F）
+      [12, 5.2, 72, 0xf2f7fc, 220, 30, true],
+      [2, 3.2, 72, 0xf0f6fc, 160, 24, true],
+      [24, 3.2, 72, 0xffe8cc, 170, 26, true],
+      [24, 7.2, 72, 0xffe8cc, 150, 24, true],
     ];
     world.pointLights = [];
     for (const p of pts) {

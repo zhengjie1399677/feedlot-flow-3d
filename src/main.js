@@ -8,6 +8,7 @@ import './buildings.js';
 import './cars.js';
 import './cows.js';
 import './vehicles.js';
+import './walk.js';
 import './effects.js';
 import './daycycle.js';
 import './ui.js';
@@ -100,14 +101,21 @@ function boot() {
     sky = FL.createSky(scene, world);
     fleet = FL.buildFleet(scene);
     if (FL.buildHerd) herd = FL.buildHerd(scene, FL.herdSpots(FL.LAYOUT || window.LAYOUT || {}));
-    rig = FL.createCameraRig(camera, canvas, fleet);
+    let walkSys = null;
+    if (FL.createWalkSystem) walkSys = FL.createWalkSystem(scene, world);
+    rig = FL.createCameraRig(camera, canvas, fleet, walkSys);
     const camId = q.get('cam');
     const known = rig.presets && rig.presets.some(function (p) { return p.id === camId; });
     rig.goPreset(known ? camId : 'overview', true);
     const pan = (q.get('pan') || '').split(',').map(Number);
     if (pan.length === 2 && isFinite(pan[0]) && isFinite(pan[1])) rig.panTo(pan[0], pan[1], true);
+    // 第一人称步行漫游：?walk=1 / ?walk=office / ?walk=hall / ?walk=dorm
+    if (q.has('walk') && rig.enterWalk) {
+      const wp = q.get('walk');
+      rig.enterWalk(wp === '' || wp === '1' || wp === 'true' ? 'office' : wp);
+    }
     // 第一人称跟车：?ride=tmr / ?ride=cattle / ?ride=1（默认 TMR 日粮车）
-    if (q.has('ride')) {
+    else if (q.has('ride')) {
       const rp = q.get('ride');
       rig.enterRide(rp === '' || rp === '1' || rp === 'true' ? 'tmr' : rp, true);
     }
@@ -120,6 +128,8 @@ function boot() {
       if (v) v.classList.add('gone');
     };
     ui = uiOn ? FL.createUI(fleet, rig) : { update: function () { }, reveal: revealVeil, setCutaway: function () { }, onCutaway: function () { } };
+    const walkOverlay = FL.createWalkOverlay ? FL.createWalkOverlay(rig) : null;
+    if (walkOverlay) ui.updateDoorPrompt = walkOverlay.updateDoorPrompt;
     // 剖视 = 幽灵屋顶：屋顶不消失，而是淡成半透明，既保住体量又能看见舍内
     // 屋顶材质和其他建筑共用，先克隆一份专用，避免整场跟着变透明
     const roofMats = [];
@@ -276,6 +286,10 @@ function boot() {
 
     ui.update(hour, fleet.stageSet(), phase);
     rig.update(dt);
+    if (world.walk && world.walk.updateDoors) {
+      world.walk.updateDoors(dt, rig.walkPos, rig.isWalking);
+    }
+    if (ui.updateDoorPrompt) ui.updateDoorPrompt(rig.nearDoor, rig.isWalking);
 
     pipe.render(scene, camera, simTime);
 
